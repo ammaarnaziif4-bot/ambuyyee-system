@@ -1,18 +1,7 @@
-# ============================================================
-# AMBUYEE SCHOOL ONLINE STUDENT REGISTRATION SYSTEM
-# Mana Barumsaa Sadarkaa 2ffaa Ambuyyee
-# Version 1.0
-#
-# Backend: Flask
-# Database: SQLite
-# Languages: Afaan Oromoo / Amharic / English
-# ============================================================
-
 import os
-import re
 import sqlite3
-import secrets
 import hashlib
+import secrets
 from datetime import datetime
 from functools import wraps
 
@@ -22,35 +11,52 @@ from flask import (
     redirect,
     url_for,
     session,
-    flash,
-    send_from_directory,
     render_template_string,
-    abort
+    send_from_directory,
+    abort,
+    flash
 )
+
 from werkzeug.utils import secure_filename
 
 
-# ============================================================
-# APPLICATION CONFIGURATION
-# ============================================================
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-DATABASE = os.path.join(BASE_DIR, "ambuyyee.db")
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# =========================================================
+# APP
+# =========================================================
 
 app = Flask(__name__)
 
-# Production keessatti SECRET_KEY kana environment variable irraa
-# kennuun gaarii dha.
 app.secret_key = os.environ.get(
     "AMBUYEE_SECRET_KEY",
-    "CHANGE-THIS-SECRET-KEY-BEFORE-PRODUCTION"
+    "AMB-CHANGE-THIS-SECRET-BEFORE-PRODUCTION"
 )
 
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
+# =========================================================
+# CONFIGURATION
+# =========================================================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DB_PATH = os.path.join(
+    BASE_DIR,
+    "ambuyyee.db"
+)
+
+UPLOAD_DIR = os.path.join(
+    BASE_DIR,
+    "uploads"
+)
+
+os.makedirs(
+    UPLOAD_DIR,
+    exist_ok=True
+)
+
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
+app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE
+
 
 ALLOWED_EXTENSIONS = {
     "jpg",
@@ -59,371 +65,25 @@ ALLOWED_EXTENSIONS = {
     "pdf"
 }
 
-GRADES = ["9", "10", "11", "12"]
 
-CLASSES = ["A", "B", "C", "D", "E", "F"]
+TEACHER_CODE = os.environ.get(
+    "AMBUYEE_TEACHER_CODE",
+    "AMB-TEACHER-DEMO"
+)
 
-GENDERS = [
-    "Male",
-    "Female"
-]
 
-STREAMS = [
-    "Natural Science",
-    "Social Science"
-]
+DIRECTOR_CODE = os.environ.get(
+    "AMBUYEE_DIRECTOR_CODE",
+    "AMB-DIRECTOR-DEMO"
+)
 
 
-# ============================================================
-# TRANSLATIONS
-# ============================================================
-
-LANG = {
-
-    "om": {
-
-        "site_name": "Mana Barumsaa Sadarkaa 2ffaa Ambuyyee",
-        "short_name": "AMB UYYEE SCHOOL",
-
-        "home": "Fuula Jalqabaa",
-        "register": "Galmee Barataa",
-        "student_login": "Seensa Barataa",
-        "teacher_login": "Seensa Barsiisaa",
-        "dashboard": "Dashboard",
-        "logout": "Ba'i",
-
-        "hero_title": "Galmee Barattootaa Online",
-        "hero_text": (
-            "Mana Barumsaa Sadarkaa 2ffaa Ambuyyee keessatti "
-            "galmee barattootaa karaa online salphaa fi sirrii ta'een raawwadhu."
-        ),
-
-        "start_registration": "Galmee Jalqabi",
-        "student_portal": "Student Portal",
-        "teacher_portal": "Teacher / Admin Portal",
-
-        "about_title": "Waa'ee Sirnichaa",
-        "about_text": (
-            "Sirni kun barattoonni mana barumsaa ala jiran "
-            "odeeffannoo fi sanadoota barbaachisan online galchanii "
-            "galmee isaanii hordofan akka danda'an qophaa'e."
-        ),
-
-        "features": "Tajaajiloota Sirnichaa",
-        "online_registration": "Galmee Online",
-        "secure_documents": "Sanadoota Eegumsa Qaban",
-        "student_tracking": "Hordoffii Galmee",
-        "teacher_verification": "Mirkaneessa Barsiisaa",
-        "statistics": "Lakkoofsa fi Statistics",
-
-        "full_name": "Maqaa Guutuu",
-        "phone": "Lakkoofsa Bilbila",
-        "national_id": "National ID",
-        "age": "Umurii",
-        "gender": "Saala",
-        "male": "Dhiira",
-        "female": "Dubartii",
-
-        "kebele": "Kebele / Ganda",
-        "zone": "Zone / Zoonii",
-        "grade": "Kutaa Barnootaa",
-        "class_name": "Class",
-        "stream": "Stream",
-
-        "school_card_front": "Kaardii Mana Barumsaa - Fuula Duraa",
-        "school_card_back": "Kaardii Mana Barumsaa - Fuula Duubaa",
-        "face_photo": "Suuraa Fuula Barataa",
-
-        "ministry_document": "Ministry Document",
-        "payment_screenshot": "Ragaa Kaffaltii",
-
-        "grade9_fee": "Kaffaltii Grade 9: 500 Birr",
-
-        "student_code": "Koodii Barataa",
-        "choose_code": "Koodii Mata Keetii Uumi",
-        "confirm_code": "Koodii Mirkaneessi",
-
-        "submit": "Galchi / Submit",
-        "save": "Olkaa'i",
-        "search": "Barbaadi",
-        "filter": "Filter",
-
-        "pending": "Eeggataa",
-        "approved": "Fudhatame",
-        "rejected": "Didame",
-        "returned": "Deebi'e",
-
-        "boys": "Dhiira",
-        "girls": "Dubartii",
-        "total": "Waliigala",
-
-        "status": "Haala Galmee",
-        "message": "Ergaa",
-        "send_message": "Ergaa Ergi",
-
-        "approve": "Approve",
-        "reject": "Reject",
-        "return": "Deebisi",
-
-        "login": "Seeni",
-        "password": "Password",
-        "admin_code": "Koodii Barsiisaa",
-
-        "student_details": "Odeeffannoo Barataa",
-        "registration_date": "Guyyaa Galmee",
-
-        "success_registration": (
-            "Baga gammaddan! Galmeen keessan milkaa'eera."
-        ),
-
-        "invalid_login": "Bilbila ykn koodiin sirrii miti.",
-        "required": "Kutaan kun dirqama.",
-        "files_required": "Sanadoonni barbaachisan guutuu ta'uu qabu.",
-        "code_mismatch": "Koodiin lamaan wal hin simne.",
-        "invalid_file": "Faayiliin kun hin hayyamamu.",
-        "saved": "Odeeffannoon milkaa'inaan olkaa'ameera.",
-
-        "login_instruction": (
-            "Lakkoofsa bilbila fi koodii ati yeroo galmee uumte fayyadami."
-        ),
-
-        "no_students": "Barataan argamuu hin dandeenye.",
-
-        "copyright": "© 2026 Mana Barumsaa Sadarkaa 2ffaa Ambuyyee"
-    },
-
-    "am": {
-
-        "site_name": "አምቡዬ 2ኛ ደረጃ ትምህርት ቤት",
-        "short_name": "AMBUYEE SCHOOL",
-
-        "home": "መነሻ",
-        "register": "የተማሪ ምዝገባ",
-        "student_login": "የተማሪ መግቢያ",
-        "teacher_login": "የመምህር መግቢያ",
-        "dashboard": "ዳሽቦርድ",
-        "logout": "ውጣ",
-
-        "hero_title": "የተማሪዎች የመስመር ላይ ምዝገባ",
-        "hero_text": (
-            "በአምቡዬ 2ኛ ደረጃ ትምህርት ቤት "
-            "ቀላልና ሙያዊ በሆነ መንገድ ይመዝገቡ።"
-        ),
-
-        "start_registration": "ምዝገባ ጀምር",
-        "student_portal": "የተማሪ Portal",
-        "teacher_portal": "የመምህር / Admin Portal",
-
-        "about_title": "ስለ ስርዓቱ",
-        "about_text": (
-            "ይህ ስርዓት ከትምህርት ቤቱ ውጭ ያሉ ተማሪዎች "
-            "አስፈላጊ መረጃና ሰነዶችን በመስመር ላይ እንዲያስገቡ "
-            "እና የምዝገባቸውን ሁኔታ እንዲከታተሉ የተዘጋጀ ነው።"
-        ),
-
-        "features": "የስርዓቱ አገልግሎቶች",
-        "online_registration": "Online ምዝገባ",
-        "secure_documents": "የተጠበቁ ሰነዶች",
-        "student_tracking": "የምዝገባ ክትትል",
-        "teacher_verification": "የመምህር ማረጋገጫ",
-        "statistics": "ስታቲስቲክስ",
-
-        "full_name": "ሙሉ ስም",
-        "phone": "ስልክ ቁጥር",
-        "national_id": "National ID",
-        "age": "ዕድሜ",
-        "gender": "ጾታ",
-        "male": "ወንድ",
-        "female": "ሴት",
-
-        "kebele": "ቀበሌ / ገንዳ",
-        "zone": "ዞን",
-        "grade": "ክፍል",
-        "class_name": "Class",
-        "stream": "Stream",
-
-        "school_card_front": "የተማሪ ካርድ - ፊት",
-        "school_card_back": "የተማሪ ካርድ - ጀርባ",
-        "face_photo": "የተማሪ ፎቶ",
-
-        "ministry_document": "የሚኒስቴር ሰነድ",
-        "payment_screenshot": "የክፍያ ማረጋገጫ",
-
-        "grade9_fee": "የ9ኛ ክፍል ክፍያ: 500 ብር",
-
-        "student_code": "የተማሪ ኮድ",
-        "choose_code": "የራስዎን ኮድ ይፍጠሩ",
-        "confirm_code": "ኮዱን ያረጋግጡ",
-
-        "submit": "ላክ",
-        "save": "አስቀምጥ",
-        "search": "ፈልግ",
-        "filter": "Filter",
-
-        "pending": "በመጠባበቅ ላይ",
-        "approved": "ተቀባይነት አግኝቷል",
-        "rejected": "ውድቅ ተደርጓል",
-        "returned": "ተመልሷል",
-
-        "boys": "ወንዶች",
-        "girls": "ሴቶች",
-        "total": "ጠቅላላ",
-
-        "status": "የምዝገባ ሁኔታ",
-        "message": "መልዕክት",
-        "send_message": "መልዕክት ላክ",
-
-        "approve": "Approve",
-        "reject": "Reject",
-        "return": "መልስ",
-
-        "login": "ግባ",
-        "password": "Password",
-        "admin_code": "የመምህር ኮድ",
-
-        "student_details": "የተማሪ መረጃ",
-        "registration_date": "የምዝገባ ቀን",
-
-        "success_registration": (
-            "እንኳን ደስ አለዎት! ምዝገባዎ በትክክል ተሳክቷል።"
-        ),
-
-        "invalid_login": "ስልክ ቁጥሩ ወይም ኮዱ ትክክል አይደለም።",
-        "required": "ይህ ክፍል ያስፈልጋል።",
-        "files_required": "አስፈላጊ ሰነዶች ሙሉ መሆን አለባቸው።",
-        "code_mismatch": "ኮዶቹ አይመሳሰሉም።",
-        "invalid_file": "ይህ ፋይል አይፈቀድም።",
-        "saved": "መረጃው በትክክል ተቀምጧል።",
-
-        "login_instruction": (
-            "በምዝገባ ጊዜ የፈጠሩትን ስልክ ቁጥርና ኮድ ይጠቀሙ።"
-        ),
-
-        "no_students": "ተማሪ አልተገኘም።",
-
-        "copyright": "© 2026 አምቡዬ 2ኛ ደረጃ ትምህርት ቤት"
-    },
-
-    "en": {
-
-        "site_name": "Ambuyyee Secondary School",
-        "short_name": "AMBUYEE SCHOOL",
-
-        "home": "Home",
-        "register": "Student Registration",
-        "student_login": "Student Login",
-        "teacher_login": "Teacher Login",
-        "dashboard": "Dashboard",
-        "logout": "Logout",
-
-        "hero_title": "Online Student Registration",
-        "hero_text": (
-            "Register at Ambuyyee Secondary School through "
-            "a simple, secure and professional online system."
-        ),
-
-        "start_registration": "Start Registration",
-        "student_portal": "Student Portal",
-        "teacher_portal": "Teacher / Admin Portal",
-
-        "about_title": "About the System",
-        "about_text": (
-            "This system allows students outside the school "
-            "to submit required information and documents online "
-            "and track their registration status."
-        ),
-
-        "features": "System Features",
-        "online_registration": "Online Registration",
-        "secure_documents": "Protected Documents",
-        "student_tracking": "Registration Tracking",
-        "teacher_verification": "Teacher Verification",
-        "statistics": "Statistics",
-
-        "full_name": "Full Name",
-        "phone": "Phone Number",
-        "national_id": "National ID",
-        "age": "Age",
-        "gender": "Gender",
-        "male": "Male",
-        "female": "Female",
-
-        "kebele": "Kebele / Ganda",
-        "zone": "Zone",
-        "grade": "Grade",
-        "class_name": "Class",
-        "stream": "Stream",
-
-        "school_card_front": "School Card - Front",
-        "school_card_back": "School Card - Back",
-        "face_photo": "Student Face Photo",
-
-        "ministry_document": "Ministry Document",
-        "payment_screenshot": "Payment Screenshot",
-
-        "grade9_fee": "Grade 9 Registration Fee: 500 Birr",
-
-        "student_code": "Student Code",
-        "choose_code": "Create Your Own Code",
-        "confirm_code": "Confirm Code",
-
-        "submit": "Submit",
-        "save": "Save",
-        "search": "Search",
-        "filter": "Filter",
-
-        "pending": "Pending",
-        "approved": "Approved",
-        "rejected": "Rejected",
-        "returned": "Returned",
-
-        "boys": "Boys",
-        "girls": "Girls",
-        "total": "Total",
-
-        "status": "Registration Status",
-        "message": "Message",
-        "send_message": "Send Message",
-
-        "approve": "Approve",
-        "reject": "Reject",
-        "return": "Return",
-
-        "login": "Login",
-        "password": "Password",
-        "admin_code": "Teacher Code",
-
-        "student_details": "Student Details",
-        "registration_date": "Registration Date",
-
-        "success_registration": (
-            "Congratulations! Your registration was submitted successfully."
-        ),
-
-        "invalid_login": "Phone number or code is incorrect.",
-        "required": "This field is required.",
-        "files_required": "Required documents must be provided.",
-        "code_mismatch": "The two codes do not match.",
-        "invalid_file": "This file type is not allowed.",
-        "saved": "Information saved successfully.",
-
-        "login_instruction": (
-            "Use the phone number and personal code you created during registration."
-        ),
-
-        "no_students": "No student was found.",
-
-        "copyright": "© 2026 Ambuyyee Secondary School"
-    }
-}
-
-
-# ============================================================
+# =========================================================
 # DATABASE
-# ============================================================
+# =========================================================
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -440,26 +100,35 @@ def init_db():
             registration_code TEXT UNIQUE NOT NULL,
 
             phone TEXT NOT NULL,
+
             code_hash TEXT NOT NULL,
 
             full_name TEXT NOT NULL,
+
             national_id TEXT NOT NULL,
+
             age INTEGER NOT NULL,
+
             gender TEXT NOT NULL,
 
             kebele TEXT NOT NULL,
+
             zone TEXT NOT NULL,
 
             grade TEXT NOT NULL,
+
             class_name TEXT NOT NULL,
 
             stream TEXT,
 
             card_front TEXT NOT NULL,
+
             card_back TEXT NOT NULL,
+
             face_photo TEXT NOT NULL,
 
             ministry_document TEXT,
+
             payment_screenshot TEXT,
 
             status TEXT NOT NULL DEFAULT 'pending',
@@ -467,6 +136,7 @@ def init_db():
             teacher_message TEXT DEFAULT '',
 
             created_at TEXT NOT NULL,
+
             updated_at TEXT NOT NULL
         )
     """)
@@ -478,37 +148,748 @@ def init_db():
 init_db()
 
 
-# ============================================================
-# SECURITY HELPERS
-# ============================================================
+# =========================================================
+# TRANSLATIONS
+# =========================================================
+
+TRANSLATIONS = {
+
+    "om": {
+
+        "home": "Fuula Jalqabaa",
+        "register": "Galmee Barataa",
+        "student_login": "Seensa Barataa",
+        "teacher_login": "Seensa Barsiisaa",
+        "director_login": "Seensa Direktera",
+
+        "school_name":
+            "Mana Barumsaa Sadarkaa 2ffaa Ambuyyee",
+
+        "student_registration":
+            "Galmee Barattootaa Online",
+
+        "start_registration":
+            "Galmee Jalqabi",
+
+        "student_portal":
+            "Student Portal",
+
+        "teacher_portal":
+            "Teacher Portal",
+
+        "director_portal":
+            "Director Portal",
+
+        "full_name":
+            "Maqaa Guutuu",
+
+        "phone":
+            "Lakkoofsa Bilbila",
+
+        "national_id":
+            "National ID",
+
+        "age":
+            "Umurii",
+
+        "gender":
+            "Saala",
+
+        "male":
+            "Dhiira",
+
+        "female":
+            "Dubartii",
+
+        "kebele":
+            "Kebele / Ganda",
+
+        "zone":
+            "Zone / Zoonii",
+
+        "grade":
+            "Kutaa Barnootaa",
+
+        "class":
+            "Kutaa",
+
+        "stream":
+            "Stream",
+
+        "natural":
+            "Natural Science",
+
+        "social":
+            "Social Science",
+
+        "card_front":
+            "School Card - Fuuldura",
+
+        "card_back":
+            "School Card - Duuba",
+
+        "face_photo":
+            "Suuraa Fuula Barataa",
+
+        "ministry_document":
+            "Ministry Document",
+
+        "payment":
+            "Ragaa Kaffaltii",
+
+        "submit":
+            "Galmee Ergi",
+
+        "login":
+            "Seeni",
+
+        "logout":
+            "Ba'i",
+
+        "student_code":
+            "Koodii Barataa",
+
+        "registration_code":
+            "Koodii Galmee",
+
+        "pending":
+            "Eeggat",
+
+        "approved":
+            "Fudhatame",
+
+        "rejected":
+            "Didame",
+
+        "returned":
+            "Deebi'e",
+
+        "total_students":
+            "Barattoota Hunda",
+
+        "total_pending":
+            "Eeggat",
+
+        "total_approved":
+            "Fudhatame",
+
+        "total_rejected":
+            "Didame",
+
+        "total_returned":
+            "Deebi'e",
+
+        "teacher_dashboard":
+            "Teacher Dashboard",
+
+        "director_dashboard":
+            "Director Dashboard",
+
+        "student_dashboard":
+            "Student Dashboard",
+
+        "search":
+            "Barbaadi",
+
+        "filter":
+            "Filter",
+
+        "all":
+            "Hunda",
+
+        "select_grade":
+            "Kutaa Filadhu",
+
+        "select_class":
+            "Class Filadhu",
+
+        "select_status":
+            "Haala Filadhu",
+
+        "students_by_class":
+            "Barattoota Kutaa Kutaan",
+
+        "class_statistics":
+            "Lakkoofsa Barattootaa Kutaa Kutaan",
+
+        "boys":
+            "Dhiira",
+
+        "girls":
+            "Dubartii",
+
+        "count":
+            "Lakkoofsa",
+
+        "view":
+            "Ilaali",
+
+        "approve":
+            "Fudhu",
+
+        "reject":
+            "Didi",
+
+        "return":
+            "Deebisi",
+
+        "message":
+            "Ergaa",
+
+        "send_message":
+            "Ergaa Ergi",
+
+        "download_pdf":
+            "PDF Buufadhu",
+
+        "class_pdf":
+            "PDF Kutaa Kana Buufadhu",
+
+        "no_students":
+            "Barataan hin argamne.",
+
+        "student_details":
+            "Odeeffannoo Barataa",
+
+        "success":
+            "Baga gammaddan! Galmeen keessan milkaa'eera.",
+
+        "wrong_code":
+            "Koodiin sirrii miti.",
+
+        "required":
+            "Dirqama",
+
+        "status":
+            "Haala",
+
+        "about":
+            "Waa'ee Mana Barumsaa",
+
+        "about_text":
+            "Mana Barumsaa Sadarkaa 2ffaa Ambuyyee keessatti "
+            "tajaajila barnootaa qulqullina qabu, sirna galmee ifa "
+            "ta'e fi bulchiinsa barattootaa ammayyaa diriirsuuf "
+            "hojjetamaa jira. Sirni kun barattoonni mana isaanii "
+            "irraa galmee online akka guutan, sanadoota barbaachisan "
+            "akka ergan, barsiisotni odeeffannoo akka mirkaneessan "
+            "fi hoggansi mana barumsaa haala barattootaa "
+            "statisticaan akka hordofu gargaara.",
+
+        "founder":
+            "Founder — Ammaar Naziif"
+    },
+
+
+    "am": {
+
+        "home": "መነሻ ገጽ",
+        "register": "የተማሪ ምዝገባ",
+        "student_login": "የተማሪ መግቢያ",
+        "teacher_login": "የመምህር መግቢያ",
+        "director_login": "የዳይሬክተር መግቢያ",
+
+        "school_name":
+            "አምቡዬ 2ኛ ደረጃ ትምህርት ቤት",
+
+        "student_registration":
+            "የተማሪዎች የመስመር ላይ ምዝገባ",
+
+        "start_registration":
+            "ምዝገባ ጀምር",
+
+        "student_portal":
+            "የተማሪ ፖርታል",
+
+        "teacher_portal":
+            "የመምህር ፖርታል",
+
+        "director_portal":
+            "የዳይሬክተር ፖርታል",
+
+        "full_name":
+            "ሙሉ ስም",
+
+        "phone":
+            "ስልክ ቁጥር",
+
+        "national_id":
+            "ብሔራዊ መታወቂያ",
+
+        "age":
+            "ዕድሜ",
+
+        "gender":
+            "ፆታ",
+
+        "male":
+            "ወንድ",
+
+        "female":
+            "ሴት",
+
+        "kebele":
+            "ቀበሌ",
+
+        "zone":
+            "ዞን",
+
+        "grade":
+            "ክፍል",
+
+        "class":
+            "ክላስ",
+
+        "stream":
+            "የትምህርት ዘርፍ",
+
+        "natural":
+            "Natural Science",
+
+        "social":
+            "Social Science",
+
+        "card_front":
+            "የተማሪ መታወቂያ - ፊት",
+
+        "card_back":
+            "የተማሪ መታወቂያ - ጀርባ",
+
+        "face_photo":
+            "የተማሪ ፎቶ",
+
+        "ministry_document":
+            "የሚኒስቴር ሰነድ",
+
+        "payment":
+            "የክፍያ ማረጋገጫ",
+
+        "submit":
+            "ምዝገባ ላክ",
+
+        "login":
+            "ግባ",
+
+        "logout":
+            "ውጣ",
+
+        "student_code":
+            "የተማሪ ኮድ",
+
+        "registration_code":
+            "የምዝገባ ኮድ",
+
+        "pending":
+            "በመጠባበቅ ላይ",
+
+        "approved":
+            "ተቀባይነት አግኝቷል",
+
+        "rejected":
+            "ተቀባይነት አላገኘም",
+
+        "returned":
+            "ተመልሷል",
+
+        "total_students":
+            "ጠቅላላ ተማሪዎች",
+
+        "total_pending":
+            "በመጠባበቅ ላይ",
+
+        "total_approved":
+            "የተቀበሉ",
+
+        "total_rejected":
+            "የተከለከሉ",
+
+        "total_returned":
+            "የተመለሱ",
+
+        "teacher_dashboard":
+            "የመምህር Dashboard",
+
+        "director_dashboard":
+            "የዳይሬክተር Dashboard",
+
+        "student_dashboard":
+            "የተማሪ Dashboard",
+
+        "search":
+            "ፈልግ",
+
+        "filter":
+            "ማጣሪያ",
+
+        "all":
+            "ሁሉም",
+
+        "select_grade":
+            "ክፍል ምረጥ",
+
+        "select_class":
+            "ክላስ ምረጥ",
+
+        "select_status":
+            "ሁኔታ ምረጥ",
+
+        "students_by_class":
+            "ተማሪዎች በክላስ",
+
+        "class_statistics":
+            "የክላስ ተማሪዎች ቁጥር",
+
+        "boys":
+            "ወንዶች",
+
+        "girls":
+            "ሴቶች",
+
+        "count":
+            "ቁጥር",
+
+        "view":
+            "እይ",
+
+        "approve":
+            "ተቀበል",
+
+        "reject":
+            "ከልክል",
+
+        "return":
+            "መልስ",
+
+        "message":
+            "መልዕክት",
+
+        "send_message":
+            "መልዕክት ላክ",
+
+        "download_pdf":
+            "PDF አውርድ",
+
+        "class_pdf":
+            "የዚህን ክላስ PDF አውርድ",
+
+        "no_students":
+            "ተማሪ አልተገኘም።",
+
+        "student_details":
+            "የተማሪ መረጃ",
+
+        "success":
+            "እንኳን ደስ አለዎት! ምዝገባዎ ተሳክቷል።",
+
+        "wrong_code":
+            "ኮዱ ትክክል አይደለም።",
+
+        "required":
+            "አስፈላጊ",
+
+        "status":
+            "ሁኔታ",
+
+        "about":
+            "ስለ ትምህርት ቤቱ",
+
+        "about_text":
+            "አምቡዬ 2ኛ ደረጃ ትምህርት ቤት ጥራት ያለው "
+            "የትምህርት አገልግሎት፣ ግልጽ የምዝገባ ስርዓት "
+            "እና ዘመናዊ የተማሪ አስተዳደር ለማቋቋም "
+            "እየሰራ ነው።",
+
+        "founder":
+            "Founder — Ammaar Naziif"
+    },
+
+
+    "en": {
+
+        "home": "Home",
+        "register": "Student Registration",
+        "student_login": "Student Login",
+        "teacher_login": "Teacher Login",
+        "director_login": "Director Login",
+
+        "school_name":
+            "Mana Barumsaa Sadarkaa 2ffaa Ambuyyee",
+
+        "student_registration":
+            "Online Student Registration",
+
+        "start_registration":
+            "Start Registration",
+
+        "student_portal":
+            "Student Portal",
+
+        "teacher_portal":
+            "Teacher Portal",
+
+        "director_portal":
+            "Director Portal",
+
+        "full_name":
+            "Full Name",
+
+        "phone":
+            "Phone Number",
+
+        "national_id":
+            "National ID",
+
+        "age":
+            "Age",
+
+        "gender":
+            "Gender",
+
+        "male":
+            "Male",
+
+        "female":
+            "Female",
+
+        "kebele":
+            "Kebele",
+
+        "zone":
+            "Zone",
+
+        "grade":
+            "Grade",
+
+        "class":
+            "Class",
+
+        "stream":
+            "Stream",
+
+        "natural":
+            "Natural Science",
+
+        "social":
+            "Social Science",
+
+        "card_front":
+            "School Card - Front",
+
+        "card_back":
+            "School Card - Back",
+
+        "face_photo":
+            "Student Face Photo",
+
+        "ministry_document":
+            "Ministry Document",
+
+        "payment":
+            "Payment Proof",
+
+        "submit":
+            "Submit Registration",
+
+        "login":
+            "Login",
+
+        "logout":
+            "Logout",
+
+        "student_code":
+            "Student Code",
+
+        "registration_code":
+            "Registration Code",
+
+        "pending":
+            "Pending",
+
+        "approved":
+            "Approved",
+
+        "rejected":
+            "Rejected",
+
+        "returned":
+            "Returned",
+
+        "total_students":
+            "Total Students",
+
+        "total_pending":
+            "Pending",
+
+        "total_approved":
+            "Approved",
+
+        "total_rejected":
+            "Rejected",
+
+        "total_returned":
+            "Returned",
+
+        "teacher_dashboard":
+            "Teacher Dashboard",
+
+        "director_dashboard":
+            "Director Dashboard",
+
+        "student_dashboard":
+            "Student Dashboard",
+
+        "search":
+            "Search",
+
+        "filter":
+            "Filter",
+
+        "all":
+            "All",
+
+        "select_grade":
+            "Select Grade",
+
+        "select_class":
+            "Select Class",
+
+        "select_status":
+            "Select Status",
+
+        "students_by_class":
+            "Students by Class",
+
+        "class_statistics":
+            "Class Statistics",
+
+        "boys":
+            "Boys",
+
+        "girls":
+            "Girls",
+
+        "count":
+            "Count",
+
+        "view":
+            "View",
+
+        "approve":
+            "Approve",
+
+        "reject":
+            "Reject",
+
+        "return":
+            "Return",
+
+        "message":
+            "Message",
+
+        "send_message":
+            "Send Message",
+
+        "download_pdf":
+            "Download PDF",
+
+        "class_pdf":
+            "Download Class PDF",
+
+        "no_students":
+            "No students found.",
+
+        "student_details":
+            "Student Details",
+
+        "success":
+            "Congratulations! Your registration was successful.",
+
+        "wrong_code":
+            "The code is incorrect.",
+
+        "required":
+            "Required",
+
+        "status":
+            "Status",
+
+        "about":
+            "About the School",
+
+        "about_text":
+            "Mana Barumsaa Sadarkaa 2ffaa Ambuyyee is working "
+            "to provide quality education, transparent registration "
+            "and modern student management. This system allows "
+            "students to register online, submit required documents, "
+            "teachers to verify information and school leadership "
+            "to monitor student statistics.",
+
+        "founder":
+            "Founder — Ammaar Naziif"
+    }
+}
+
+
+def get_lang():
+
+    lang = request.args.get("lang")
+
+    if lang in TRANSLATIONS:
+        session["lang"] = lang
+
+    return session.get(
+        "lang",
+        "om"
+    )
+
+
+def t(key):
+
+    lang = get_lang()
+
+    return TRANSLATIONS.get(
+        lang,
+        TRANSLATIONS["om"]
+    ).get(
+        key,
+        key
+    )
+
+
+@app.context_processor
+def inject_globals():
+
+    return {
+        "t": t,
+        "lang": get_lang()
+    }
+
+
+# =========================================================
+# HELPERS
+# =========================================================
 
 def hash_code(code):
+
     return hashlib.sha256(
         code.encode("utf-8")
     ).hexdigest()
 
 
-def verify_code(code, saved_hash):
-    return secrets.compare_digest(
-        hash_code(code),
-        saved_hash
-    )
-
-
 def allowed_file(filename):
 
-    if not filename:
+    if not filename or "." not in filename:
         return False
 
-    if "." not in filename:
-        return False
+    ext = filename.rsplit(
+        ".",
+        1
+    )[1].lower()
 
-    extension = filename.rsplit(".", 1)[1].lower()
-
-    return extension in ALLOWED_EXTENSIONS
+    return ext in ALLOWED_EXTENSIONS
 
 
-def save_upload(file, prefix):
+def save_uploaded(file, prefix):
 
     if not file or not file.filename:
         return None
@@ -516,26 +897,34 @@ def save_upload(file, prefix):
     if not allowed_file(file.filename):
         return None
 
-    original = secure_filename(file.filename)
+    original = secure_filename(
+        file.filename
+    )
 
-    extension = original.rsplit(".", 1)[1].lower()
+    if "." not in original:
+        return None
 
-    unique_name = (
+    ext = original.rsplit(
+        ".",
+        1
+    )[1].lower()
+
+    filename = (
         prefix
         + "_"
-        + secrets.token_hex(12)
+        + secrets.token_hex(10)
         + "."
-        + extension
+        + ext
     )
 
     path = os.path.join(
-        UPLOAD_FOLDER,
-        unique_name
+        UPLOAD_DIR,
+        filename
     )
 
     file.save(path)
 
-    return unique_name
+    return filename
 
 
 def generate_registration_code():
@@ -549,1129 +938,1201 @@ def generate_registration_code():
 
         conn = get_db()
 
-        existing = conn.execute(
-            "SELECT id FROM students WHERE registration_code = ?",
+        row = conn.execute(
+            """
+            SELECT id
+            FROM students
+            WHERE registration_code=?
+            """,
             (code,)
         ).fetchone()
 
         conn.close()
 
-        if not existing:
+        if not row:
             return code
 
 
-# ============================================================
-# LANGUAGE
-# ============================================================
+def student_logged():
 
-def current_lang():
-
-    language = session.get("lang", "om")
-
-    if language not in LANG:
-        language = "om"
-
-    return language
+    return "student_id" in session
 
 
-@app.context_processor
-def inject_globals():
+def teacher_required(fn):
 
-    return {
-        "t": LANG[current_lang()],
-        "current_lang": current_lang()
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+
+        if session.get(
+            "teacher_logged"
+        ) is not True:
+
+            return redirect(
+                url_for("teacher_login")
+            )
+
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+def director_required(fn):
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+
+        if session.get(
+            "director_logged"
+        ) is not True:
+
+            return redirect(
+                url_for("director_login")
+            )
+
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+# =========================================================
+# STATUS HELPERS
+# =========================================================
+
+def status_text(status):
+
+    mapping = {
+        "pending": t("pending"),
+        "approved": t("approved"),
+        "rejected": t("rejected"),
+        "returned": t("returned")
     }
 
-
-@app.route("/language/<language>")
-def change_language(language):
-
-    if language in LANG:
-        session["lang"] = language
-
-    return redirect(
-        request.referrer or url_for("home")
+    return mapping.get(
+        status,
+        status
     )
 
 
-# ============================================================
-# ADMIN AUTHENTICATION
-# ============================================================
+@app.context_processor
+def status_globals():
 
-def admin_required(function):
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-
-        if not session.get("admin_logged_in"):
-            return redirect(
-                url_for("admin_login")
-            )
-
-        return function(*args, **kwargs)
-
-    return wrapper
+    return {
+        "status_text": status_text
+    }
 
 
-def student_required(function):
+# =========================================================
+# PROFESSIONAL DESIGN
+# =========================================================
 
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-
-        if not session.get("student_id"):
-            return redirect(
-                url_for("student_login")
-            )
-
-        return function(*args, **kwargs)
-
-    return wrapper
-
-
-# ============================================================
-# GLOBAL HTML / CSS
-# ============================================================
-
-BASE_HTML = """
-
-<!DOCTYPE html>
-
-<html lang="{{ current_lang }}">
-
-<head>
-
-<meta charset="UTF-8">
-
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
-
-<title>{{ title }} | Ambuyyee School</title>
+BASE_STYLE = """
 
 <style>
 
+:root {
+    --bg: #050a12;
+    --bg2: #091321;
+    --card: rgba(15, 27, 44, .92);
+    --card2: #101e31;
+    --border: rgba(214, 174, 87, .18);
+    --gold: #d8b463;
+    --gold2: #f0d38d;
+    --text: #f5f7fa;
+    --muted: #9ba8ba;
+    --blue: #1b3150;
+    --green: #25865b;
+    --red: #a63f47;
+    --orange: #b56e2f;
+}
+
 * {
     box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+}
+
+html {
+    scroll-behavior: smooth;
 }
 
 body {
+
+    margin: 0;
+
     font-family:
         Arial,
-        Helvetica,
+        "Noto Sans",
         sans-serif;
 
     background:
+        radial-gradient(
+            circle at 10% 0%,
+            rgba(216,180,99,.12),
+            transparent 30%
+        ),
+        radial-gradient(
+            circle at 90% 20%,
+            rgba(31,77,125,.15),
+            transparent 30%
+        ),
         linear-gradient(
             135deg,
-            #07111f,
-            #0d1b2e,
-            #101827
+            #040911,
+            #081321 50%,
+            #050a12
         );
 
-    color: #f4f7fb;
+    color: var(--text);
+
     min-height: 100vh;
 }
 
 a {
     text-decoration: none;
-    color: inherit;
 }
 
-.navbar {
-    width: 100%;
-    padding: 18px 5%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    background: rgba(5, 12, 23, .92);
-
-    border-bottom:
-        1px solid rgba(255,255,255,.08);
+.nav {
 
     position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(12px);
-}
 
-.brand {
+    top: 0;
+
+    z-index: 100;
+
+    background:
+        rgba(5, 11, 19, .92);
+
+    backdrop-filter:
+        blur(16px);
+
+    border-bottom:
+        1px solid
+        rgba(216,180,99,.18);
+
+    padding:
+        14px 5%;
+
     display: flex;
+
     align-items: center;
-    gap: 12px;
-    font-weight: 800;
+
+    justify-content: space-between;
+
+    gap: 15px;
+
+    flex-wrap: wrap;
 }
 
 .logo {
-    width: 45px;
-    height: 45px;
-    border-radius: 13px;
+
+    color: var(--gold2);
+
+    font-size: 20px;
+
+    font-weight: 800;
+
+    letter-spacing: 1px;
 
     display: flex;
+
     align-items: center;
-    justify-content: center;
+
+    gap: 8px;
+}
+
+.logo::before {
+
+    content: "";
+
+    width: 9px;
+
+    height: 9px;
+
+    border-radius: 50%;
+
+    background: var(--gold);
+
+    box-shadow:
+        0 0 15px
+        rgba(216,180,99,.7);
+}
+
+.navlinks {
+
+    display: flex;
+
+    gap: 5px;
+
+    flex-wrap: wrap;
+
+    align-items: center;
+}
+
+.navlinks a {
+
+    color: #dbe2eb;
+
+    padding:
+        8px 11px;
+
+    border-radius: 8px;
+
+    font-size: 13px;
+
+    transition: .2s;
+}
+
+.navlinks a:hover {
+
+    color: var(--gold2);
+
+    background:
+        rgba(216,180,99,.09);
+}
+
+.container {
+
+    width: 92%;
+
+    max-width: 1280px;
+
+    margin:
+        32px auto;
+}
+
+.hero {
+
+    position: relative;
+
+    overflow: hidden;
+
+    padding:
+        70px 42px;
+
+    border-radius: 26px;
+
+    background:
+
+        linear-gradient(
+            135deg,
+            rgba(17,32,53,.98),
+            rgba(8,18,31,.96)
+        );
+
+    border:
+        1px solid
+        rgba(216,180,99,.20);
+
+    box-shadow:
+        0 30px 80px
+        rgba(0,0,0,.35);
+}
+
+.hero::before {
+
+    content: "";
+
+    position: absolute;
+
+    width: 300px;
+
+    height: 300px;
+
+    right: -100px;
+
+    top: -130px;
+
+    border-radius: 50%;
+
+    background:
+        rgba(216,180,99,.10);
+
+    filter: blur(10px);
+}
+
+.hero::after {
+
+    content: "";
+
+    position: absolute;
+
+    width: 180px;
+
+    height: 180px;
+
+    left: -80px;
+
+    bottom: -100px;
+
+    border-radius: 50%;
+
+    background:
+        rgba(50,105,170,.12);
+}
+
+.hero h1 {
+
+    position: relative;
+
+    z-index: 1;
+
+    color: var(--gold2);
+
+    font-size:
+        clamp(30px, 5vw, 52px);
+
+    line-height: 1.1;
+
+    margin:
+        0 0 15px;
+}
+
+.hero h2 {
+
+    position: relative;
+
+    z-index: 1;
+
+    font-size: 25px;
+
+    margin:
+        0 0 15px;
+}
+
+.hero p {
+
+    position: relative;
+
+    z-index: 1;
+
+    color: #b9c4d2;
+
+    line-height: 1.9;
+
+    max-width: 850px;
+}
+
+.btn {
+
+    display: inline-block;
+
+    padding:
+        11px 17px;
+
+    border-radius: 9px;
 
     background:
         linear-gradient(
             135deg,
-            #d8b25c,
-            #fff0aa
+            #e2c477,
+            #bd9445
         );
 
-    color: #08111e;
-    font-weight: 900;
-    box-shadow:
-        0 8px 25px rgba(216,178,92,.18);
-}
+    color: #111;
 
-.brand-text {
-    max-width: 260px;
-    line-height: 1.25;
-}
+    border: none;
 
-.nav-links {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
+    cursor: pointer;
 
-.nav-links a,
-.lang-btn {
-    padding: 9px 12px;
-    border-radius: 9px;
-    color: #dce6f3;
-    font-size: 14px;
-}
-
-.nav-links a:hover,
-.lang-btn:hover {
-    background: rgba(255,255,255,.07);
-    color: #fff;
-}
-
-.langs {
-    display: flex;
-    gap: 4px;
-    margin-left: 6px;
-}
-
-.lang-btn.active {
-    background: #d8b25c;
-    color: #07111f;
     font-weight: 800;
+
+    margin: 4px;
+
+    transition:
+        transform .2s,
+        box-shadow .2s,
+        opacity .2s;
+
+    box-shadow:
+        0 7px 20px
+        rgba(216,180,99,.12);
 }
 
-.container {
-    width: 90%;
-    max-width: 1200px;
-    margin: 0 auto;
+.btn:hover {
+
+    transform:
+        translateY(-2px);
+
+    box-shadow:
+        0 10px 25px
+        rgba(216,180,99,.20);
+
+    opacity: .95;
 }
 
-.hero {
-    padding: 90px 0 70px;
-    text-align: center;
+.btn.dark {
+
+    background:
+        #122238;
+
+    color: #f4f7fa;
+
+    border:
+        1px solid
+        #2e435d;
+
+    box-shadow: none;
 }
 
-.hero h1 {
-    font-size: clamp(35px, 7vw, 72px);
-    line-height: 1.05;
-    margin-bottom: 22px;
+.btn.green {
 
     background:
         linear-gradient(
-            90deg,
-            #ffffff,
-            #d8b25c,
-            #ffffff
+            135deg,
+            #299464,
+            #176b46
         );
 
-    -webkit-background-clip: text;
-    color: transparent;
-}
-
-.hero p {
-    max-width: 760px;
-    margin: auto;
-    color: #aebbd0;
-    font-size: 18px;
-    line-height: 1.8;
-}
-
-.buttons {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 32px;
-}
-
-.btn {
-    border: none;
-    cursor: pointer;
-
-    padding: 13px 20px;
-    border-radius: 11px;
-
-    font-weight: 800;
-    font-size: 14px;
-}
-
-.btn-primary {
-    background: #d8b25c;
-    color: #07111f;
-}
-
-.btn-primary:hover {
-    background: #f0cf79;
-}
-
-.btn-dark {
-    background: #17263a;
-    color: #fff;
-    border: 1px solid rgba(255,255,255,.08);
-}
-
-.btn-danger {
-    background: #9f3040;
     color: white;
 }
 
-.btn-success {
-    background: #217a52;
+.btn.red {
+
+    background:
+        linear-gradient(
+            135deg,
+            #b34d53,
+            #823139
+        );
+
     color: white;
 }
 
-.btn-warning {
-    background: #9a7525;
+.btn.orange {
+
+    background:
+        linear-gradient(
+            135deg,
+            #c17a36,
+            #8e501f
+        );
+
     color: white;
-}
-
-.section {
-    padding: 60px 0;
-}
-
-.section-title {
-    text-align: center;
-    margin-bottom: 35px;
-}
-
-.section-title h2 {
-    font-size: 32px;
-    margin-bottom: 10px;
-}
-
-.section-title p {
-    color: #9eabc0;
-}
-
-.cards {
-    display: grid;
-    grid-template-columns:
-        repeat(auto-fit, minmax(220px, 1fr));
-
-    gap: 18px;
 }
 
 .card {
+
     background:
-        rgba(255,255,255,.045);
+        linear-gradient(
+            145deg,
+            rgba(16,31,50,.96),
+            rgba(10,22,37,.96)
+        );
 
     border:
-        1px solid rgba(255,255,255,.08);
+        1px solid
+        var(--border);
 
     border-radius: 18px;
-    padding: 25px;
+
+    padding: 23px;
+
+    margin-bottom: 20px;
 
     box-shadow:
-        0 15px 50px rgba(0,0,0,.16);
+        0 18px 45px
+        rgba(0,0,0,.20);
 }
 
-.card h3 {
-    margin-bottom: 10px;
+.card h1,
+.card h2 {
+
+    color: var(--gold2);
 }
 
-.card p {
-    color: #aab8cb;
-    line-height: 1.65;
+.card h1 {
+
+    margin-top: 0;
 }
 
-.icon {
-    font-size: 30px;
-    margin-bottom: 15px;
+.grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(210px, 1fr)
+        );
+
+    gap: 15px;
 }
 
-.form-wrapper {
-    max-width: 900px;
-    margin: 45px auto;
-}
+.stat {
 
-.form-card {
+    position: relative;
+
+    overflow: hidden;
+
     background:
-        rgba(255,255,255,.045);
+        linear-gradient(
+            145deg,
+            #11243b,
+            #0b192b
+        );
 
     border:
-        1px solid rgba(255,255,255,.09);
+        1px solid
+        rgba(216,180,99,.14);
 
-    border-radius: 22px;
-    padding: 30px;
+    border-radius: 15px;
 
-    box-shadow:
-        0 20px 70px rgba(0,0,0,.25);
+    padding: 21px;
 }
 
-.form-card h1 {
-    margin-bottom: 8px;
+.stat::after {
+
+    content: "";
+
+    position: absolute;
+
+    width: 75px;
+
+    height: 75px;
+
+    right: -25px;
+
+    top: -25px;
+
+    border-radius: 50%;
+
+    background:
+        rgba(216,180,99,.07);
 }
 
-.form-card > p {
-    color: #aebbd0;
-    margin-bottom: 28px;
-    line-height: 1.6;
-}
+.stat h3 {
 
-.form-grid {
-    display: grid;
-    grid-template-columns:
-        repeat(2, minmax(0, 1fr));
+    color: var(--muted);
 
-    gap: 18px;
-}
+    margin-top: 0;
 
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.full {
-    grid-column: 1 / -1;
-}
-
-label {
-    font-weight: 700;
     font-size: 14px;
-    color: #dbe4f1;
+}
+
+.stat strong {
+
+    font-size: 34px;
+
+    color: var(--gold2);
 }
 
 input,
 select,
 textarea {
+
     width: 100%;
 
     padding: 13px 14px;
 
-    background: #0c1828;
-    color: #fff;
+    background:
+        rgba(4,12,22,.90);
 
     border:
-        1px solid rgba(255,255,255,.12);
+        1px solid
+        #30455f;
 
-    border-radius: 10px;
+    color: white;
+
+    border-radius: 9px;
+
+    margin-top: 7px;
+
+    margin-bottom: 17px;
+
     outline: none;
+
+    transition:
+        border .2s,
+        box-shadow .2s;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-    border-color: #d8b25c;
+
+    border-color:
+        var(--gold);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(216,180,99,.08);
+}
+
+select option {
+
+    background: #0c1828;
+
+    color: white;
 }
 
 textarea {
-    min-height: 130px;
+
+    min-height: 115px;
+
     resize: vertical;
 }
 
-.file-note {
-    color: #8493a8;
-    font-size: 12px;
+label {
+
+    font-weight: 700;
+
+    color: #dce3eb;
 }
 
-.hidden {
-    display: none !important;
-}
+input[type="file"] {
 
-.alert {
-    padding: 14px 16px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    background: rgba(216,178,92,.12);
-    border: 1px solid rgba(216,178,92,.25);
-}
+    padding: 10px;
 
-.stats {
-    display: grid;
-    grid-template-columns:
-        repeat(auto-fit, minmax(160px, 1fr));
-
-    gap: 15px;
-    margin-bottom: 25px;
-}
-
-.stat {
-    padding: 20px;
-    border-radius: 16px;
-    background: rgba(255,255,255,.045);
-    border: 1px solid rgba(255,255,255,.08);
-}
-
-.stat-number {
-    font-size: 32px;
-    font-weight: 900;
-    color: #d8b25c;
-}
-
-.stat-label {
-    color: #aebbd0;
-    margin-top: 5px;
-}
-
-.table-wrapper {
-    overflow-x: auto;
-    background: rgba(255,255,255,.035);
-    border-radius: 16px;
+    cursor: pointer;
 }
 
 table {
+
     width: 100%;
+
     border-collapse: collapse;
-    min-width: 900px;
+
+    min-width: 800px;
 }
 
 th,
 td {
-    padding: 14px;
+
+    padding: 12px;
+
     border-bottom:
-        1px solid rgba(255,255,255,.07);
+        1px solid
+        #26384e;
 
     text-align: left;
 }
 
 th {
-    color: #d8b25c;
+
+    color: var(--gold2);
+
+    background:
+        #12243a;
+
     font-size: 13px;
 }
 
-td {
-    color: #dce5f0;
-    font-size: 14px;
+tbody tr {
+
+    transition: background .15s;
 }
 
-.badge {
-    display: inline-block;
-    padding: 6px 9px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 800;
+tbody tr:hover {
+
+    background:
+        rgba(216,180,99,.045);
 }
 
-.badge-pending {
-    background: #72591e;
-    color: #ffe9a5;
-}
+.table-wrap {
 
-.badge-approved {
-    background: #185d40;
-    color: #b8ffdb;
-}
+    overflow-x: auto;
 
-.badge-rejected {
-    background: #71303a;
-    color: #ffc5cc;
-}
-
-.badge-returned {
-    background: #4d5360;
-    color: #dfe5ef;
-}
-
-.filters {
-    display: grid;
-    grid-template-columns:
-        repeat(auto-fit, minmax(170px, 1fr));
-
-    gap: 12px;
-    margin-bottom: 22px;
-}
-
-.grade-stat-grid {
-    display: grid;
-    grid-template-columns:
-        repeat(auto-fit, minmax(240px, 1fr));
-
-    gap: 15px;
-}
-
-.grade-box {
-    padding: 18px;
-    background: rgba(255,255,255,.04);
-    border: 1px solid rgba(255,255,255,.08);
-    border-radius: 15px;
-}
-
-.grade-box h3 {
-    margin-bottom: 14px;
-    color: #d8b25c;
-}
-
-.class-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255,255,255,.05);
-    color: #b7c4d5;
-}
-
-.detail-grid {
-    display: grid;
-    grid-template-columns:
-        repeat(2, minmax(0, 1fr));
-
-    gap: 15px;
-}
-
-.detail-item {
-    padding: 15px;
-    background: rgba(255,255,255,.035);
     border-radius: 12px;
 }
 
-.detail-item span {
-    display: block;
-    color: #8392a7;
-    font-size: 12px;
-    margin-bottom: 5px;
+.badge {
+
+    display: inline-block;
+
+    padding:
+        5px 10px;
+
+    border-radius: 30px;
+
+    font-size: 11px;
+
+    font-weight: 800;
+
+    text-transform: uppercase;
 }
 
-.detail-item strong {
-    color: #fff;
+.badge.pending {
+
+    background:
+        rgba(161,124,42,.25);
+
+    color:
+        #e6c66e;
 }
 
-.document-grid {
-    display: grid;
-    grid-template-columns:
-        repeat(auto-fit, minmax(200px, 1fr));
+.badge.approved {
 
-    gap: 15px;
-    margin-top: 20px;
+    background:
+        rgba(37,134,91,.22);
+
+    color:
+        #62d59d;
 }
 
-.document-card {
-    background: rgba(255,255,255,.035);
-    border-radius: 14px;
-    padding: 14px;
+.badge.rejected {
+
+    background:
+        rgba(166,63,71,.25);
+
+    color:
+        #f08088;
 }
 
-.document-card img {
-    width: 100%;
-    height: 180px;
+.badge.returned {
+
+    background:
+        rgba(181,110,47,.24);
+
+    color:
+        #e5a35e;
+}
+
+.preview {
+
+    width: 230px;
+
+    max-width: 100%;
+
+    max-height: 280px;
+
     object-fit: cover;
-    border-radius: 10px;
+
+    border-radius: 14px;
+
+    border:
+        1px solid
+        rgba(216,180,99,.25);
+
+    box-shadow:
+        0 15px 35px
+        rgba(0,0,0,.30);
 }
 
-.document-card iframe {
-    width: 100%;
-    height: 220px;
-    border: none;
+.alert {
+
+    background:
+        linear-gradient(
+            135deg,
+            #142d47,
+            #102238
+        );
+
+    border:
+        1px solid
+        #36597a;
+
+    padding: 14px 16px;
+
     border-radius: 10px;
+
+    margin-bottom: 16px;
+
+    color: #dce8f5;
 }
 
-.footer {
-    margin-top: 70px;
-    padding: 30px 5%;
+.success-box {
+
     text-align: center;
-    color: #7e8da2;
-    border-top: 1px solid rgba(255,255,255,.07);
+
+    padding: 40px 20px;
 }
 
-.mobile-space {
-    height: 10px;
+.code-box {
+
+    display: inline-block;
+
+    padding:
+        15px 25px;
+
+    margin:
+        10px 0 20px;
+
+    border-radius: 12px;
+
+    background:
+        #071321;
+
+    border:
+        1px solid
+        rgba(216,180,99,.35);
+
+    color:
+        var(--gold2);
+
+    font-size: 25px;
+
+    font-weight: 900;
+
+    letter-spacing: 2px;
 }
 
-@media(max-width: 750px) {
+.section-title {
 
-    .navbar {
-        flex-direction: column;
-        gap: 15px;
-        align-items: flex-start;
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    gap: 10px;
+
+    flex-wrap: wrap;
+}
+
+.muted {
+
+    color:
+        var(--muted);
+}
+
+footer {
+
+    margin-top: 55px;
+
+    padding:
+        30px 20px;
+
+    text-align: center;
+
+    color:
+        #8492a5;
+
+    border-top:
+        1px solid
+        rgba(216,180,99,.13);
+
+    line-height: 1.8;
+}
+
+.footer-gold {
+
+    color:
+        var(--gold);
+}
+
+@media(max-width: 700px) {
+
+    .nav {
+
+        padding:
+            12px 4%;
+
     }
 
-    .nav-links {
+    .navlinks {
+
         width: 100%;
     }
 
-    .form-grid,
-    .detail-grid {
-        grid-template-columns: 1fr;
+    .navlinks a {
+
+        font-size: 12px;
+
+        padding:
+            7px 8px;
     }
 
-    .full {
-        grid-column: auto;
-    }
+    .container {
 
-    .form-card {
-        padding: 20px;
+        width: 94%;
+
+        margin-top: 20px;
     }
 
     .hero {
-        padding-top: 55px;
+
+        padding:
+            42px 22px;
     }
 
+    .hero h1 {
+
+        font-size: 31px;
+    }
+
+    .card {
+
+        padding:
+            17px;
+    }
+
+    .stat strong {
+
+        font-size: 29px;
+    }
 }
 
 </style>
-
-</head>
-
-<body>
-
-<nav class="navbar">
-
-    <a class="brand" href="{{ url_for('home') }}">
-
-        <div class="logo">
-            A
-        </div>
-
-        <div class="brand-text">
-            {{ t.site_name }}
-        </div>
-
-    </a>
-
-    <div class="nav-links">
-
-        <a href="{{ url_for('home') }}">
-            {{ t.home }}
-        </a>
-
-        <a href="{{ url_for('register') }}">
-            {{ t.register }}
-        </a>
-
-        <a href="{{ url_for('student_login') }}">
-            {{ t.student_login }}
-        </a>
-
-        <a href="{{ url_for('admin_login') }}">
-            {{ t.teacher_login }}
-        </a>
-
-        <div class="langs">
-
-            <a
-                class="lang-btn {% if current_lang == 'om' %}active{% endif %}"
-                href="{{ url_for('change_language', language='om') }}"
-            >
-                Afaan Oromoo
-            </a>
-
-            <a
-                class="lang-btn {% if current_lang == 'am' %}active{% endif %}"
-                href="{{ url_for('change_language', language='am') }}"
-            >
-                አማ
-            </a>
-
-            <a
-                class="lang-btn {% if current_lang == 'en' %}active{% endif %}"
-                href="{{ url_for('change_language', language='en') }}"
-            >
-                EN
-            </a>
-
-        </div>
-
-    </div>
-
-</nav>
-
-
-{% with messages = get_flashed_messages() %}
-
-    {% if messages %}
-
-        <div class="container" style="margin-top:20px;">
-
-            {% for message in messages %}
-
-                <div class="alert">
-                    {{ message }}
-                </div>
-
-            {% endfor %}
-
-        </div>
-
-    {% endif %}
-
-{% endwith %}
-
-
-{% block_content %}{% endblock %}
-
-
-<footer class="footer">
-
-    {{ t.copyright }}
-
-</footer>
-
-</body>
-
-</html>
-
 """
 
 
-def render_page(content, title="Ambuyyee School", **context):
+# =========================================================
+# PAGE WRAPPER
+# =========================================================
 
-    html = BASE_HTML.replace(
-        "{% block_content %}{% endblock %}",
-        content
-    )
+def page(title, body):
 
     return render_template_string(
-        html,
-        title=title,
-        **context
+
+        """
+        <!doctype html>
+
+        <html lang="{{ lang }}">
+
+        <head>
+
+            <meta charset="utf-8">
+
+            <meta
+                name="viewport"
+                content="width=device-width, initial-scale=1"
+            >
+
+            <meta
+                name="theme-color"
+                content="#050a12"
+            >
+
+            <title>{{ title }} | Ambuyyee</title>
+
+        """ + BASE_STYLE + """
+
+        </head>
+
+        <body>
+
+        <nav class="nav">
+
+            <a
+                class="logo"
+                href="{{ url_for('home') }}"
+            >
+                AMBUYEE
+            </a>
+
+            <div class="navlinks">
+
+                <a href="{{ url_for('home') }}">
+                    {{ t('home') }}
+                </a>
+
+                <a href="{{ url_for('register') }}">
+                    {{ t('register') }}
+                </a>
+
+                <a href="{{ url_for('student_login') }}">
+                    {{ t('student_login') }}
+                </a>
+
+                <a href="{{ url_for('teacher_login') }}">
+                    {{ t('teacher_login') }}
+                </a>
+
+                <a href="{{ url_for('director_login') }}">
+                    {{ t('director_login') }}
+                </a>
+
+                <a href="?lang=om">OR</a>
+
+                <a href="?lang=am">አማ</a>
+
+                <a href="?lang=en">EN</a>
+
+            </div>
+
+        </nav>
+
+
+        <main class="container">
+
+            {% with messages =
+                get_flashed_messages()
+            %}
+
+                {% if messages %}
+
+                    {% for message in messages %}
+
+                        <div class="alert">
+                            {{ message }}
+                        </div>
+
+                    {% endfor %}
+
+                {% endif %}
+
+            {% endwith %}
+
+
+            """ + body + """
+
+
+        </main>
+
+
+        <footer>
+
+            <div class="footer-gold">
+                {{ t('school_name') }}
+            </div>
+
+            <div>
+                {{ t('founder') }}
+            </div>
+
+        </footer>
+
+
+        </body>
+
+        </html>
+        """,
+
+        title=title
     )
 
 
-# ============================================================
+# =========================================================
 # HOME
-# ============================================================
+# =========================================================
 
 @app.route("/")
 def home():
 
-    content = """
+    body = """
 
-<section class="hero">
-
-    <div class="container">
+    <section class="hero">
 
         <h1>
-            {{ t.hero_title }}
+            {{ t('school_name') }}
         </h1>
 
+        <h2>
+            {{ t('student_registration') }}
+        </h2>
+
         <p>
-            {{ t.hero_text }}
+            {{ t('about_text') }}
         </p>
 
-        <div class="buttons">
+        <br>
 
-            <a
-                class="btn btn-primary"
-                href="{{ url_for('register') }}"
-            >
-                {{ t.start_registration }}
-            </a>
+        <a
+            class="btn"
+            href="{{ url_for('register') }}"
+        >
+            {{ t('start_registration') }}
+        </a>
 
-            <a
-                class="btn btn-dark"
-                href="{{ url_for('student_login') }}"
-            >
-                {{ t.student_portal }}
-            </a>
+        <a
+            class="btn dark"
+            href="{{ url_for('student_login') }}"
+        >
+            {{ t('student_portal') }}
+        </a>
 
-            <a
-                class="btn btn-dark"
-                href="{{ url_for('admin_login') }}"
-            >
-                {{ t.teacher_portal }}
-            </a>
+        <a
+            class="btn dark"
+            href="{{ url_for('teacher_login') }}"
+        >
+            {{ t('teacher_portal') }}
+        </a>
 
-        </div>
+        <a
+            class="btn dark"
+            href="{{ url_for('director_login') }}"
+        >
+            {{ t('director_portal') }}
+        </a>
 
-    </div>
-
-</section>
-
-
-<section class="section">
-
-    <div class="container">
-
-        <div class="section-title">
-
-            <h2>
-                {{ t.features }}
-            </h2>
-
-        </div>
+    </section>
 
 
-        <div class="cards">
+    <div class="card">
 
-            <div class="card">
+        <h2>
+            {{ t('about') }}
+        </h2>
 
-                <div class="icon">📝</div>
-
-                <h3>
-                    {{ t.online_registration }}
-                </h3>
-
-                <p>
-                    {{ t.about_text }}
-                </p>
-
-            </div>
-
-
-            <div class="card">
-
-                <div class="icon">🔐</div>
-
-                <h3>
-                    {{ t.secure_documents }}
-                </h3>
-
-                <p>
-                    Student cards, photos and required documents
-                    are stored through the application backend.
-                </p>
-
-            </div>
-
-
-            <div class="card">
-
-                <div class="icon">📊</div>
-
-                <h3>
-                    {{ t.statistics }}
-                </h3>
-
-                <p>
-                    Teachers can see students by grade,
-                    class and gender.
-                </p>
-
-            </div>
-
-
-            <div class="card">
-
-                <div class="icon">👨‍🏫</div>
-
-                <h3>
-                    {{ t.teacher_verification }}
-                </h3>
-
-                <p>
-                    Submitted registration can be reviewed
-                    before approval.
-                </p>
-
-            </div>
-
-        </div>
+        <p class="muted">
+            {{ t('about_text') }}
+        </p>
 
     </div>
 
-</section>
+    """
 
-
-<section class="section">
-
-    <div class="container">
-
-        <div class="section-title">
-
-            <h2>
-                {{ t.about_title }}
-            </h2>
-
-            <p>
-                {{ t.about_text }}
-            </p>
-
-        </div>
-
-    </div>
-
-</section>
-
-"""
-
-    return render_page(
-        content,
-        title=LANG[current_lang()]["home"]
+    return page(
+        t("home"),
+        body
     )
 
 
-# ============================================================
+# =========================================================
 # STUDENT REGISTRATION
-# ============================================================
+# =========================================================
 
-@app.route("/register", methods=["GET", "POST"])
+@app.route(
+    "/register",
+    methods=["GET", "POST"]
+)
 def register():
 
     if request.method == "POST":
 
         full_name = request.form.get(
-            "full_name", ""
+            "full_name",
+            ""
         ).strip()
 
         phone = request.form.get(
-            "phone", ""
+            "phone",
+            ""
         ).strip()
 
         national_id = request.form.get(
-            "national_id", ""
+            "national_id",
+            ""
         ).strip()
 
-        age_text = request.form.get(
-            "age", ""
+        age = request.form.get(
+            "age",
+            ""
         ).strip()
 
         gender = request.form.get(
-            "gender", ""
+            "gender",
+            ""
         ).strip()
 
         kebele = request.form.get(
-            "kebele", ""
+            "kebele",
+            ""
         ).strip()
 
         zone = request.form.get(
-            "zone", ""
+            "zone",
+            ""
         ).strip()
 
         grade = request.form.get(
-            "grade", ""
+            "grade",
+            ""
         ).strip()
 
         class_name = request.form.get(
-            "class_name", ""
+            "class_name",
+            ""
         ).strip()
 
         stream = request.form.get(
-            "stream", ""
+            "stream",
+            ""
         ).strip()
 
-        personal_code = request.form.get(
-            "personal_code", ""
+        student_code = request.form.get(
+            "student_code",
+            ""
         ).strip()
 
-        confirm_code = request.form.get(
-            "confirm_code", ""
-        ).strip()
-
-
-        # ----------------------------------------------------
-        # BASIC VALIDATION
-        # ----------------------------------------------------
-
-        if not all([
-            full_name,
-            phone,
-            national_id,
-            age_text,
-            gender,
-            kebele,
-            zone,
-            grade,
-            class_name,
-            personal_code,
-            confirm_code
-        ]):
-
-            flash(
-                LANG[current_lang()]["required"]
-            )
-
-            return redirect(
-                url_for("register")
-            )
-
-
-        try:
-            age = int(age_text)
-        except ValueError:
-
-            flash(
-                LANG[current_lang()]["required"]
-            )
-
-            return redirect(
-                url_for("register")
-            )
-
-
-        if age < 5 or age > 100:
-
-            flash(
-                LANG[current_lang()]["required"]
-            )
-
-            return redirect(
-                url_for("register")
-            )
-
-
-        if grade not in GRADES:
-
-            abort(400)
-
-
-        if class_name not in CLASSES:
-
-            abort(400)
-
-
-        if gender not in GENDERS:
-
-            abort(400)
-
-
-        if grade in ["11", "12"]:
-
-            if stream not in STREAMS:
-                flash(
-                    LANG[current_lang()]["required"]
-                )
-                return redirect(
-                    url_for("register")
-                )
-
-        else:
-
-            stream = None
-
-
-        # ----------------------------------------------------
-        # PERSONAL CODE
-        # ----------------------------------------------------
-
-        if len(personal_code) < 6:
-
-            flash(
-                "Koodiin yoo xiqqaate characters 6 qabaachuu qaba."
-            )
-
-            return redirect(
-                url_for("register")
-            )
-
-
-        if personal_code != confirm_code:
-
-            flash(
-                LANG[current_lang()]["code_mismatch"]
-            )
-
-            return redirect(
-                url_for("register")
-            )
-
-
-        # ----------------------------------------------------
-        # FILES
-        # ----------------------------------------------------
 
         card_front = request.files.get(
             "card_front"
@@ -1685,19 +2146,35 @@ def register():
             "face_photo"
         )
 
-        ministry_document = request.files.get(
+        ministry = request.files.get(
             "ministry_document"
         )
 
-        payment_screenshot = request.files.get(
+        payment = request.files.get(
             "payment_screenshot"
         )
 
 
-        if not card_front or not card_back or not face_photo:
+        required_values = [
+
+            full_name,
+            phone,
+            national_id,
+            age,
+            gender,
+            kebele,
+            zone,
+            grade,
+            class_name,
+            student_code
+
+        ]
+
+
+        if not all(required_values):
 
             flash(
-                LANG[current_lang()]["files_required"]
+                t("required")
             )
 
             return redirect(
@@ -1705,99 +2182,290 @@ def register():
             )
 
 
-        # Grade 9 requires ministry + payment
-        if grade == "9":
-
-            if not ministry_document or not payment_screenshot:
-
-                flash(
-                    LANG[current_lang()]["files_required"]
-                )
-
-                return redirect(
-                    url_for("register")
-                )
-
-
-        # ----------------------------------------------------
-        # SAVE FILES
-        # ----------------------------------------------------
-
-        registration_code = generate_registration_code()
-
-
-        saved_card_front = save_upload(
-            card_front,
-            registration_code + "_card_front"
-        )
-
-        saved_card_back = save_upload(
-            card_back,
-            registration_code + "_card_back"
-        )
-
-        saved_face = save_upload(
-            face_photo,
-            registration_code + "_face"
-        )
-
-
-        if not saved_card_front or not saved_card_back or not saved_face:
+        if len(student_code) < 6:
 
             flash(
-                LANG[current_lang()]["invalid_file"]
+                "Student code must contain "
+                "at least 6 characters."
             )
 
             return redirect(
                 url_for("register")
             )
 
-
-        saved_ministry = None
-        saved_payment = None
-
-
-        if grade == "9":
-
-            saved_ministry = save_upload(
-                ministry_document,
-                registration_code + "_ministry"
-            )
-
-            saved_payment = save_upload(
-                payment_screenshot,
-                registration_code + "_payment"
-            )
-
-            if not saved_ministry or not saved_payment:
-
-                flash(
-                    LANG[current_lang()]["invalid_file"]
-                )
-
-                return redirect(
-                    url_for("register")
-                )
-
-
-        # ----------------------------------------------------
-        # DATABASE INSERT
-        # ----------------------------------------------------
-
-        now = datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-
-        code_hash = hash_code(
-            personal_code
-        )
-
-        conn = get_db()
 
         try:
 
-            conn.execute("""
+            age_int = int(age)
+
+        except ValueError:
+
+            flash(
+                "Age must be a number."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if age_int < 1 or age_int > 100:
+
+            flash(
+                "Please enter a valid age."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if grade not in [
+            "9",
+            "10",
+            "11",
+            "12"
+        ]:
+
+            flash(
+                "Invalid grade."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if class_name not in [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+        ]:
+
+            flash(
+                "Invalid class."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if grade in ["11", "12"]:
+
+            if stream not in [
+                "Natural Science",
+                "Social Science"
+            ]:
+
+                flash(
+                    "Please select a stream."
+                )
+
+                return redirect(
+                    url_for("register")
+                )
+
+
+        if grade == "9":
+
+            if (
+                not ministry
+                or not ministry.filename
+            ):
+
+                flash(
+                    "Ministry document is required for Grade 9."
+                )
+
+                return redirect(
+                    url_for("register")
+                )
+
+
+            if (
+                not payment
+                or not payment.filename
+            ):
+
+                flash(
+                    "Payment screenshot is required for Grade 9."
+                )
+
+                return redirect(
+                    url_for("register")
+                )
+
+
+        if (
+            not card_front
+            or not card_front.filename
+        ):
+
+            flash(
+                "School card front is required."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if (
+            not card_back
+            or not card_back.filename
+        ):
+
+            flash(
+                "School card back is required."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        if (
+            not face_photo
+            or not face_photo.filename
+        ):
+
+            flash(
+                "Face photo is required."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        # Validate files before saving
+
+        required_files = [
+            card_front,
+            card_back,
+            face_photo
+        ]
+
+        for file in required_files:
+
+            if not allowed_file(
+                file.filename
+            ):
+
+                flash(
+                    "One or more files have "
+                    "an unsupported format."
+                )
+
+                return redirect(
+                    url_for("register")
+                )
+
+
+        if ministry and ministry.filename:
+
+            if not allowed_file(
+                ministry.filename
+            ):
+
+                flash(
+                    "Invalid ministry document."
+                )
+
+                return redirect(
+                    url_for("register")
+                )
+
+
+        if payment and payment.filename:
+
+            if not allowed_file(
+                payment.filename
+            ):
+
+                flash(
+                    "Invalid payment file."
+                )
+
+                return redirect(
+                    url_for("register")
+                )
+
+
+        reg_code = generate_registration_code()
+
+        prefix = reg_code.replace(
+            "-",
+            "_"
+        )
+
+
+        front_name = save_uploaded(
+            card_front,
+            prefix + "_front"
+        )
+
+        back_name = save_uploaded(
+            card_back,
+            prefix + "_back"
+        )
+
+        face_name = save_uploaded(
+            face_photo,
+            prefix + "_face"
+        )
+
+
+        ministry_name = None
+
+        payment_name = None
+
+
+        if ministry and ministry.filename:
+
+            ministry_name = save_uploaded(
+                ministry,
+                prefix + "_ministry"
+            )
+
+
+        if payment and payment.filename:
+
+            payment_name = save_uploaded(
+                payment,
+                prefix + "_payment"
+            )
+
+
+        if not all([
+            front_name,
+            back_name,
+            face_name
+        ]):
+
+            flash(
+                "One or more uploaded files are invalid."
+            )
+
+            return redirect(
+                url_for("register")
+            )
+
+
+        conn = get_db()
+
+
+        try:
+
+            conn.execute(
+                """
+
                 INSERT INTO students (
+
                     registration_code,
                     phone,
                     code_hash,
@@ -1819,990 +2487,860 @@ def register():
                     teacher_message,
                     created_at,
                     updated_at
+
                 )
 
                 VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    ?,?,?,?,?,?,?,?,?,?,
+                    ?,?,?,?,?,?,?,?,?,?,
+                    ?
                 )
-            """, (
 
-                registration_code,
-                phone,
-                code_hash,
-                full_name,
-                national_id,
-                age,
-                gender,
-                kebele,
-                zone,
-                grade,
-                class_name,
-                stream,
-                saved_card_front,
-                saved_card_back,
-                saved_face,
-                saved_ministry,
-                saved_payment,
-                "pending",
-                "",
-                now,
-                now
+                """,
 
-            ))
+                (
+
+                    reg_code,
+                    phone,
+                    hash_code(student_code),
+                    full_name,
+                    national_id,
+                    age_int,
+                    gender,
+                    kebele,
+                    zone,
+                    grade,
+                    class_name,
+                    stream,
+                    front_name,
+                    back_name,
+                    face_name,
+                    ministry_name,
+                    payment_name,
+                    "pending",
+                    "",
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat()
+
+                )
+            )
+
 
             conn.commit()
+
 
         except sqlite3.IntegrityError:
 
             conn.close()
 
             flash(
-                "Registration already exists."
+                "Registration could not be completed."
             )
 
             return redirect(
                 url_for("register")
             )
 
+
         conn.close()
 
 
-        # ----------------------------------------------------
-        # SHOW SUCCESS PAGE
-        # ----------------------------------------------------
+        body = """
 
-        return render_page(
-            """
+        <div class="card success-box">
 
-            <section class="section">
+            <h1>
+                {{ t('success') }}
+            </h1>
 
-                <div class="container">
+            <p class="muted">
+                {{ t('registration_code') }}
+            </p>
 
-                    <div class="form-card" style="text-align:center;">
+            <div class="code-box">
+                {{ reg_code }}
+            </div>
 
-                        <div style="font-size:55px;">
-                            ✅
-                        </div>
+            <p>
+                Keep this registration code safe.
+                You will need it when you log in.
+            </p>
 
-                        <h1>
-                            {{ t.success_registration }}
-                        </h1>
+            <a
+                class="btn"
+                href="{{ url_for('student_login') }}"
+            >
+                {{ t('student_login') }}
+            </a>
 
-                        <p>
-                            {{ t.student_code }}
-                        </p>
+        </div>
 
-                        <div
-                            style="
-                                font-size:28px;
-                                font-weight:900;
-                                color:#d8b25c;
-                                margin:20px 0;
-                            "
-                        >
-                            {{ registration_code }}
-                        </div>
+        """
 
-                        <p>
-                            {{ t.login_instruction }}
-                        </p>
 
-                        <div class="buttons">
+        return page(
 
-                            <a
-                                href="{{ url_for('student_login') }}"
-                                class="btn btn-primary"
-                            >
-                                {{ t.student_login }}
-                            </a>
+            t("success"),
 
-                            <a
-                                href="{{ url_for('home') }}"
-                                class="btn btn-dark"
-                            >
-                                {{ t.home }}
-                            </a>
+            render_template_string(
+                body,
+                reg_code=reg_code
+            )
 
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-            """,
-
-            title="Registration Success",
-
-            registration_code=registration_code
         )
 
 
-    # --------------------------------------------------------
-    # GET REGISTRATION PAGE
-    # --------------------------------------------------------
+    # =====================================================
+    # REGISTRATION FORM
+    # =====================================================
 
-    content = """
+    body = """
 
-<section class="section">
+    <div class="card">
 
-<div class="container">
+        <div class="section-title">
 
-<div class="form-wrapper">
+            <div>
 
-<div class="form-card">
+                <h1>
+                    {{ t('register') }}
+                </h1>
 
-<h1>
-    {{ t.register }}
-</h1>
+                <p class="muted">
+                    Fill in all required information carefully.
+                </p>
 
-<p>
-    {{ t.about_text }}
-</p>
+            </div>
 
+        </div>
 
-<form
-    method="POST"
-    enctype="multipart/form-data"
->
 
+        <form
+            method="POST"
+            enctype="multipart/form-data"
+        >
 
-<div class="form-grid">
 
+            <div class="grid">
 
-<div class="form-group full">
+                <div>
 
-<label>
-    {{ t.full_name }}
-</label>
+                    <label>
+                        {{ t('full_name') }} *
+                    </label>
 
-<input
-    type="text"
-    name="full_name"
-    required
->
+                    <input
+                        name="full_name"
+                        required
+                    >
 
-</div>
+                </div>
 
 
-<div class="form-group">
+                <div>
 
-<label>
-    {{ t.phone }}
-</label>
+                    <label>
+                        {{ t('phone') }} *
+                    </label>
 
-<input
-    type="tel"
-    name="phone"
-    placeholder="09XXXXXXXX"
-    required
->
+                    <input
+                        name="phone"
+                        required
+                    >
 
-</div>
+                </div>
 
 
-<div class="form-group">
+                <div>
 
-<label>
-    {{ t.national_id }}
-</label>
+                    <label>
+                        {{ t('national_id') }} *
+                    </label>
 
-<input
-    type="text"
-    name="national_id"
-    required
->
+                    <input
+                        name="national_id"
+                        required
+                    >
 
-</div>
+                </div>
 
 
-<div class="form-group">
+                <div>
 
-<label>
-    {{ t.age }}
-</label>
+                    <label>
+                        {{ t('age') }} *
+                    </label>
 
-<input
-    type="number"
-    name="age"
-    min="5"
-    max="100"
-    required
->
+                    <input
+                        name="age"
+                        type="number"
+                        min="1"
+                        max="100"
+                        required
+                    >
 
-</div>
+                </div>
 
 
-<div class="form-group">
+                <div>
 
-<label>
-    {{ t.gender }}
-</label>
+                    <label>
+                        {{ t('gender') }} *
+                    </label>
 
-<select name="gender" required>
+                    <select
+                        name="gender"
+                        required
+                    >
 
-<option value="">
-    -- Select --
-</option>
+                        <option value="">
+                            --
+                        </option>
 
-<option value="Male">
-    {{ t.male }}
-</option>
+                        <option value="Male">
+                            {{ t('male') }}
+                        </option>
 
-<option value="Female">
-    {{ t.female }}
-</option>
+                        <option value="Female">
+                            {{ t('female') }}
+                        </option>
 
-</select>
+                    </select>
 
-</div>
+                </div>
 
 
-<div class="form-group">
+                <div>
 
-<label>
-    {{ t.kebele }}
-</label>
+                    <label>
+                        {{ t('kebele') }} *
+                    </label>
 
-<input
-    type="text"
-    name="kebele"
-    required
->
+                    <input
+                        name="kebele"
+                        required
+                    >
 
-</div>
+                </div>
 
 
-<div class="form-group">
+                <div>
 
-<label>
-    {{ t.zone }}
-</label>
+                    <label>
+                        {{ t('zone') }} *
+                    </label>
 
-<input
-    type="text"
-    name="zone"
-    required
->
+                    <input
+                        name="zone"
+                        required
+                    >
 
-</div>
+                </div>
 
 
-<div class="form-group">
+                <div>
 
-<label>
-    {{ t.grade }}
-</label>
+                    <label>
+                        {{ t('grade') }} *
+                    </label>
 
-<select
-    name="grade"
-    id="grade"
-    required
->
+                    <select
+                        name="grade"
+                        required
+                    >
 
-<option value="">
-    -- Select Grade --
-</option>
+                        <option value="">
+                            --
+                        </option>
 
-<option value="9">Grade 9</option>
-<option value="10">Grade 10</option>
-<option value="11">Grade 11</option>
-<option value="12">Grade 12</option>
+                        <option value="9">
+                            Grade 9
+                        </option>
 
-</select>
+                        <option value="10">
+                            Grade 10
+                        </option>
 
-</div>
+                        <option value="11">
+                            Grade 11
+                        </option>
 
+                        <option value="12">
+                            Grade 12
+                        </option>
 
-<div class="form-group">
+                    </select>
 
-<label>
-    {{ t.class_name }}
-</label>
+                </div>
 
-<select
-    name="class_name"
-    required
->
 
-<option value="">
-    -- Select Class --
-</option>
+                <div>
 
-<option value="A">Class A</option>
-<option value="B">Class B</option>
-<option value="C">Class C</option>
-<option value="D">Class D</option>
-<option value="E">Class E</option>
-<option value="F">Class F</option>
+                    <label>
+                        {{ t('class') }} *
+                    </label>
 
-</select>
+                    <select
+                        name="class_name"
+                        required
+                    >
 
-</div>
+                        <option value="">
+                            --
+                        </option>
 
+                        <option>A</option>
+                        <option>B</option>
+                        <option>C</option>
+                        <option>D</option>
+                        <option>E</option>
+                        <option>F</option>
 
-<div
-    class="form-group full"
-    id="stream-box"
->
+                    </select>
 
-<label>
-    {{ t.stream }}
-</label>
+                </div>
 
-<select name="stream">
 
-<option value="">
-    -- Select Stream --
-</option>
+                <div>
 
-<option value="Natural Science">
-    Natural Science
-</option>
+                    <label>
+                        {{ t('stream') }}
+                    </label>
 
-<option value="Social Science">
-    Social Science
-</option>
+                    <select
+                        name="stream"
+                    >
 
-</select>
+                        <option value="">
+                            --
+                        </option>
 
-</div>
+                        <option value="Natural Science">
+                            {{ t('natural') }}
+                        </option>
 
+                        <option value="Social Science">
+                            {{ t('social') }}
+                        </option>
 
-<div class="form-group full">
+                    </select>
 
-<label>
-    {{ t.choose_code }}
-</label>
+                </div>
 
-<input
-    type="password"
-    name="personal_code"
-    minlength="6"
-    required
->
+            </div>
 
-<div class="file-note">
-    Koodii ati filattu yoo xiqqaate characters 6 haa qabaatu.
-</div>
 
-</div>
+            <div class="card">
 
+                <h2>
+                    Login Security
+                </h2>
 
-<div class="form-group full">
+                <label>
+                    {{ t('student_code') }} *
+                </label>
 
-<label>
-    {{ t.confirm_code }}
-</label>
+                <input
+                    name="student_code"
+                    type="password"
+                    minlength="6"
+                    required
+                >
 
-<input
-    type="password"
-    name="confirm_code"
-    minlength="6"
-    required
->
+                <p class="muted">
+                    Use at least 6 characters.
+                    Remember this code for your future login.
+                </p>
 
-</div>
+            </div>
 
 
-<div class="form-group">
+            <div class="card">
 
-<label>
-    {{ t.school_card_front }}
-</label>
+                <h2>
+                    Required Documents
+                </h2>
 
-<input
-    type="file"
-    name="card_front"
-    accept=".jpg,.jpeg,.png,.pdf"
-    required
->
 
-<div class="file-note">
-    JPG, PNG ykn PDF
-</div>
+                <label>
+                    {{ t('card_front') }} *
+                </label>
 
-</div>
+                <input
+                    type="file"
+                    name="card_front"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    required
+                >
 
 
-<div class="form-group">
+                <label>
+                    {{ t('card_back') }} *
+                </label>
 
-<label>
-    {{ t.school_card_back }}
-</label>
+                <input
+                    type="file"
+                    name="card_back"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    required
+                >
 
-<input
-    type="file"
-    name="card_back"
-    accept=".jpg,.jpeg,.png,.pdf"
-    required
->
 
-<div class="file-note">
-    JPG, PNG ykn PDF
-</div>
+                <label>
+                    {{ t('face_photo') }} *
+                </label>
 
-</div>
+                <input
+                    type="file"
+                    name="face_photo"
+                    accept=".jpg,.jpeg,.png"
+                    required
+                >
 
 
-<div class="form-group full">
+                <label>
+                    {{ t('ministry_document') }}
+                </label>
 
-<label>
-    {{ t.face_photo }}
-</label>
+                <input
+                    type="file"
+                    name="ministry_document"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                >
 
-<input
-    type="file"
-    name="face_photo"
-    accept=".jpg,.jpeg,.png"
-    required
->
 
-<div class="file-note">
-    Suura qulqulluu fuula barataa.
-</div>
+                <label>
+                    {{ t('payment') }}
+                </label>
 
-</div>
+                <input
+                    type="file"
+                    name="payment_screenshot"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                >
 
+            </div>
 
-<div class="form-group full">
 
-<div
-    class="card"
-    style="
-        padding:16px;
-        margin:0;
-    "
->
+            <button
+                class="btn"
+                type="submit"
+            >
+                {{ t('submit') }}
+            </button>
 
-<strong>
-    {{ t.grade9_fee }}
-</strong>
 
-<p style="margin-top:8px;">
-    Grade 9 qofaaf Ministry Document fi
-    payment screenshot barbaachisa.
-</p>
+        </form>
 
-</div>
+    </div>
 
-</div>
+    """
 
-
-<div
-    class="form-group"
-    id="ministry-box"
->
-
-<label>
-    {{ t.ministry_document }}
-</label>
-
-<input
-    type="file"
-    name="ministry_document"
-    accept=".jpg,.jpeg,.png,.pdf"
->
-
-</div>
-
-
-<div
-    class="form-group"
-    id="payment-box"
->
-
-<label>
-    {{ t.payment_screenshot }}
-</label>
-
-<input
-    type="file"
-    name="payment_screenshot"
-    accept=".jpg,.jpeg,.png,.pdf"
->
-
-</div>
-
-
-<div class="form-group full">
-
-<button
-    type="submit"
-    class="btn btn-primary"
-    style="width:100%;"
->
-    {{ t.submit }}
-</button>
-
-</div>
-
-
-</div>
-
-</form>
-
-</div>
-
-</div>
-
-</div>
-
-</section>
-
-
-<script>
-
-const grade = document.getElementById("grade");
-
-const streamBox =
-    document.getElementById("stream-box");
-
-const ministryBox =
-    document.getElementById("ministry-box");
-
-const paymentBox =
-    document.getElementById("payment-box");
-
-
-function updateGradeFields() {
-
-    const value = grade.value;
-
-    if (value === "11" || value === "12") {
-
-        streamBox.classList.remove("hidden");
-
-    } else {
-
-        streamBox.classList.add("hidden");
-
-    }
-
-
-    if (value === "9") {
-
-        ministryBox.classList.remove("hidden");
-        paymentBox.classList.remove("hidden");
-
-    } else {
-
-        ministryBox.classList.add("hidden");
-        paymentBox.classList.add("hidden");
-
-    }
-
-}
-
-
-grade.addEventListener(
-    "change",
-    updateGradeFields
-);
-
-updateGradeFields();
-
-</script>
-
-"""
-
-    return render_page(
-        content,
-        title=LANG[current_lang()]["register"]
+    return page(
+        t("register"),
+        body
     )
 
 
-# ============================================================
+# =========================================================
 # STUDENT LOGIN
-# ============================================================
+# =========================================================
 
-@app.route("/student/login", methods=["GET", "POST"])
+@app.route(
+    "/student/login",
+    methods=["GET", "POST"]
+)
 def student_login():
 
     if request.method == "POST":
 
-        phone = request.form.get(
-            "phone", ""
+        registration_code = request.form.get(
+            "registration_code",
+            ""
         ).strip()
 
-        code = request.form.get(
-            "code", ""
+        student_code = request.form.get(
+            "student_code",
+            ""
         ).strip()
 
 
         conn = get_db()
 
-        student = conn.execute("""
+
+        student = conn.execute(
+            """
+
             SELECT *
+
             FROM students
-            WHERE phone = ?
-            ORDER BY id DESC
-            LIMIT 1
-        """, (phone,)).fetchone()
+
+            WHERE registration_code=?
+
+            AND code_hash=?
+
+            """,
+
+            (
+                registration_code,
+                hash_code(student_code)
+            )
+
+        ).fetchone()
+
 
         conn.close()
 
 
-        if student and verify_code(
-            code,
-            student["code_hash"]
-        ):
+        if not student:
 
-            session.clear()
-
-            session["student_id"] = student["id"]
+            flash(
+                t("wrong_code")
+            )
 
             return redirect(
-                url_for("student_dashboard")
+                url_for("student_login")
             )
 
 
-        flash(
-            LANG[current_lang()]["invalid_login"]
+        session.clear()
+
+        session["student_id"] = student["id"]
+
+        return redirect(
+            url_for("student_dashboard")
         )
 
 
-    content = """
+    body = """
 
-<section class="section">
+    <div
+        class="card"
+        style="max-width:550px;margin:40px auto;"
+    >
 
-<div class="container">
+        <h1>
+            {{ t('student_login') }}
+        </h1>
 
-<div class="form-wrapper">
-
-<div class="form-card">
-
-<h1>
-    {{ t.student_login }}
-</h1>
-
-<p>
-    {{ t.login_instruction }}
-</p>
+        <p class="muted">
+            Enter your registration code and student code.
+        </p>
 
 
-<form method="POST">
+        <form method="POST">
 
-<div class="form-group">
+            <label>
+                {{ t('registration_code') }}
+            </label>
 
-<label>
-    {{ t.phone }}
-</label>
-
-<input
-    type="tel"
-    name="phone"
-    required
->
-
-</div>
+            <input
+                name="registration_code"
+                placeholder="AMB-XXXXXXXXXX"
+                required
+            >
 
 
-<div
-    class="form-group"
-    style="margin-top:18px;"
->
+            <label>
+                {{ t('student_code') }}
+            </label>
 
-<label>
-    {{ t.student_code }}
-</label>
-
-<input
-    type="password"
-    name="code"
-    required
->
-
-</div>
+            <input
+                type="password"
+                name="student_code"
+                required
+            >
 
 
-<button
-    class="btn btn-primary"
-    style="
-        width:100%;
-        margin-top:20px;
-    "
->
-    {{ t.login }}
-</button>
+            <button
+                class="btn"
+                type="submit"
+            >
+                {{ t('login') }}
+            </button>
 
-</form>
+        </form>
 
-</div>
+    </div>
 
-</div>
+    """
 
-</div>
-
-</section>
-
-"""
-
-    return render_page(
-        content,
-        title=LANG[current_lang()]["student_login"]
+    return page(
+        t("student_login"),
+        body
     )
 
 
-# ============================================================
+# =========================================================
 # STUDENT DASHBOARD
-# ============================================================
+# =========================================================
 
 @app.route("/student/dashboard")
-@student_required
 def student_dashboard():
 
-    student_id = session["student_id"]
+    if not student_logged():
 
-    conn = get_db()
-
-    student = conn.execute(
-        "SELECT * FROM students WHERE id = ?",
-        (student_id,)
-    ).fetchone()
-
-    conn.close()
-
-
-    if not student:
-        session.clear()
         return redirect(
             url_for("student_login")
         )
 
 
-    status_class = {
-        "pending": "badge-pending",
-        "approved": "badge-approved",
-        "rejected": "badge-rejected",
-        "returned": "badge-returned"
-    }.get(
-        student["status"],
-        "badge-pending"
+    conn = get_db()
+
+
+    student = conn.execute(
+        """
+
+        SELECT *
+
+        FROM students
+
+        WHERE id=?
+
+        """,
+
+        (
+            session["student_id"],
+        )
+
+    ).fetchone()
+
+
+    conn.close()
+
+
+    if not student:
+
+        session.clear()
+
+        return redirect(
+            url_for("student_login")
+        )
+
+
+    body = """
+
+    <div class="card">
+
+        <div class="section-title">
+
+            <div>
+
+                <p
+                    class="muted"
+                    style="margin-bottom:5px;"
+                >
+                    {{ t('student_dashboard') }}
+                </p>
+
+                <h1>
+                    {{ student['full_name'] }}
+                </h1>
+
+            </div>
+
+            <a
+                class="btn dark"
+                href="{{ url_for('student_logout') }}"
+            >
+                {{ t('logout') }}
+            </a>
+
+        </div>
+
+
+        <div class="grid">
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('registration_code') }}
+                </h3>
+
+                <strong
+                    style="font-size:20px;"
+                >
+                    {{ student['registration_code'] }}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('grade') }}
+                </h3>
+
+                <strong>
+                    {{ student['grade'] }}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('class') }}
+                </h3>
+
+                <strong>
+                    {{ student['class_name'] }}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('status') }}
+                </h3>
+
+                <span
+                    class="badge
+                    {{ student['status'] }}"
+                >
+                    {{ status_text(student['status']) }}
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>
+            {{ t('student_details') }}
+        </h2>
+
+
+        <div class="grid">
+
+            <div>
+                <p>
+                    <strong>
+                        {{ t('full_name') }}:
+                    </strong>
+                    {{ student['full_name'] }}
+                </p>
+
+                <p>
+                    <strong>
+                        {{ t('phone') }}:
+                    </strong>
+                    {{ student['phone'] }}
+                </p>
+
+                <p>
+                    <strong>
+                        {{ t('national_id') }}:
+                    </strong>
+                    {{ student['national_id'] }}
+                </p>
+
+                <p>
+                    <strong>
+                        {{ t('age') }}:
+                    </strong>
+                    {{ student['age'] }}
+                </p>
+            </div>
+
+
+            <div>
+
+                <p>
+                    <strong>
+                        {{ t('gender') }}:
+                    </strong>
+                    {{ student['gender'] }}
+                </p>
+
+                <p>
+                    <strong>
+                        {{ t('kebele') }}:
+                    </strong>
+                    {{ student['kebele'] }}
+                </p>
+
+                <p>
+                    <strong>
+                        {{ t('zone') }}:
+                    </strong>
+                    {{ student['zone'] }}
+                </p>
+
+                <p>
+                    <strong>
+                        {{ t('stream') }}:
+                    </strong>
+                    {{ student['stream'] or '-' }}
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    {% if student['teacher_message'] %}
+
+    <div class="card">
+
+        <h2>
+            {{ t('message') }}
+        </h2>
+
+        <div class="alert">
+
+            {{ student['teacher_message'] }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    <div class="card">
+
+        <h2>
+            {{ t('face_photo') }}
+        </h2>
+
+        <img
+            class="preview"
+            src="{{ url_for(
+                'uploaded_file',
+                filename=student['face_photo']
+            ) }}"
+        >
+
+    </div>
+
+    """
+
+    return page(
+
+        t("student_dashboard"),
+
+        render_template_string(
+            body,
+            student=student
+        )
+
     )
 
 
-    status_text = {
-        "pending": LANG[current_lang()]["pending"],
-        "approved": LANG[current_lang()]["approved"],
-        "rejected": LANG[current_lang()]["rejected"],
-        "returned": LANG[current_lang()]["returned"]
-    }.get(
-        student["status"],
-        student["status"]
-    )
-
-
-    content = """
-
-<section class="section">
-
-<div class="container">
-
-<div class="section-title">
-
-<h2>
-    {{ t.dashboard }}
-</h2>
-
-<p>
-    {{ student["full_name"] }}
-</p>
-
-</div>
-
-
-<div class="card">
-
-<div class="detail-grid">
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.student_code }}
-</span>
-
-<strong>
-    {{ student["registration_code"] }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.status }}
-</span>
-
-<strong>
-
-<span class="badge {{ status_class }}">
-    {{ status_text }}
-</span>
-
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.full_name }}
-</span>
-
-<strong>
-    {{ student["full_name"] }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.phone }}
-</span>
-
-<strong>
-    {{ student["phone"] }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.grade }}
-</span>
-
-<strong>
-    Grade {{ student["grade"] }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.class_name }}
-</span>
-
-<strong>
-    Class {{ student["class_name"] }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.gender }}
-</span>
-
-<strong>
-    {{ student["gender"] }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.stream }}
-</span>
-
-<strong>
-    {{ student["stream"] or "-" }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.kebele }}
-</span>
-
-<strong>
-    {{ student["kebele"] }}
-</strong>
-
-</div>
-
-
-<div class="detail-item">
-
-<span>
-    {{ t.zone }}
-</span>
-
-<strong>
-    {{ student["zone"] }}
-</strong>
-
-</div>
-
-
-</div>
-
-
-{% if student["teacher_message"] %}
-
-<div
-    class="alert"
-    style="margin-top:20px;"
->
-
-<strong>
-    {{ t.message }}
-</strong>
-
-<br><br>
-
-{{ student["teacher_message"] }}
-
-</div>
-
-{% endif %}
-
-
-<div class="buttons">
-
-<a
-    class="btn btn-dark"
-    href="{{ url_for('student_logout') }}"
->
-    {{ t.logout }}
-</a>
-
-</div>
-
-</div>
-
-</div>
-
-</section>
-
-"""
-
-    return render_page(
-        content,
-        title=LANG[current_lang()]["dashboard"],
-        student=student,
-        status_class=status_class,
-        status_text=status_text
-    )
-
+# =========================================================
+# STUDENT LOGOUT
+# =========================================================
 
 @app.route("/student/logout")
 def student_logout():
@@ -2814,136 +3352,111 @@ def student_logout():
     )
 
 
-# ============================================================
-# ADMIN LOGIN
-# ============================================================
+# =========================================================
+# TEACHER LOGIN
+# =========================================================
 
-@app.route("/admin/login", methods=["GET", "POST"])
-def admin_login():
+@app.route(
+    "/teacher/login",
+    methods=["GET", "POST"]
+)
+def teacher_login():
 
     if request.method == "POST":
 
-        entered_code = request.form.get(
-            "admin_code", ""
+        code = request.form.get(
+            "code",
+            ""
         ).strip()
 
 
-        # IMPORTANT:
-        # Production keessatti kana environment variable
-        # keessatti ofii keetiin kaa'i.
-        admin_code = os.environ.get(
-            "AMBUYEE_ADMIN_CODE",
-            "AMB-TEACHER-DEMO-CHANGE-ME"
-        )
+        if code != TEACHER_CODE:
 
-
-        if secrets.compare_digest(
-            entered_code,
-            admin_code
-        ):
-
-            session.clear()
-
-            session["admin_logged_in"] = True
+            flash(
+                t("wrong_code")
+            )
 
             return redirect(
-                url_for("admin_dashboard")
+                url_for("teacher_login")
             )
 
 
-        flash(
-            LANG[current_lang()]["invalid_login"]
+        session.clear()
+
+        session["teacher_logged"] = True
+
+        return redirect(
+            url_for("teacher_dashboard")
         )
 
 
-    content = """
+    body = """
 
-<section class="section">
+    <div
+        class="card"
+        style="max-width:550px;margin:40px auto;"
+    >
 
-<div class="container">
+        <h1>
+            {{ t('teacher_login') }}
+        </h1>
 
-<div class="form-wrapper">
-
-<div class="form-card">
-
-<h1>
-    {{ t.teacher_login }}
-</h1>
-
-<p>
-    Teacher/Admin access only.
-</p>
+        <p class="muted">
+            Authorized teacher access only.
+        </p>
 
 
-<form method="POST">
+        <form method="POST">
 
-<div class="form-group">
+            <label>
+                Teacher Code
+            </label>
 
-<label>
-    {{ t.admin_code }}
-</label>
-
-<input
-    type="password"
-    name="admin_code"
-    required
->
-
-</div>
+            <input
+                type="password"
+                name="code"
+                required
+            >
 
 
-<button
-    class="btn btn-primary"
-    style="
-        width:100%;
-        margin-top:20px;
-    "
->
-    {{ t.login }}
-</button>
+            <button
+                class="btn"
+                type="submit"
+            >
+                {{ t('login') }}
+            </button>
 
-</form>
+        </form>
 
-</div>
+    </div>
 
-</div>
+    """
 
-</div>
-
-</section>
-
-"""
-
-    return render_page(
-        content,
-        title=LANG[current_lang()]["teacher_login"]
+    return page(
+        t("teacher_login"),
+        body
     )
 
 
-# ============================================================
-# ADMIN DASHBOARD
-# ============================================================
+# =========================================================
+# TEACHER DASHBOARD
+# =========================================================
 
-@app.route("/admin/dashboard")
-@admin_required
-def admin_dashboard():
+@app.route("/teacher/dashboard")
+@teacher_required
+def teacher_dashboard():
 
-    grade_filter = request.args.get(
+    grade = request.args.get(
         "grade",
         ""
     ).strip()
 
-    class_filter = request.args.get(
+    class_name = request.args.get(
         "class_name",
         ""
     ).strip()
 
-    gender_filter = request.args.get(
-        "gender",
-        ""
-    ).strip()
-
-    status_filter = request.args.get(
+    status = request.args.get(
         "status",
         ""
     ).strip()
@@ -2957,66 +3470,225 @@ def admin_dashboard():
     conn = get_db()
 
 
-    # --------------------------------------------------------
-    # MAIN STUDENT QUERY
-    # --------------------------------------------------------
+    total = conn.execute(
+        "SELECT COUNT(*) FROM students"
+    ).fetchone()[0]
+
+
+    pending = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='pending'
+        """
+    ).fetchone()[0]
+
+
+    approved = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='approved'
+        """
+    ).fetchone()[0]
+
+
+    rejected = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='rejected'
+        """
+    ).fetchone()[0]
+
+
+    returned = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='returned'
+        """
+    ).fetchone()[0]
+
+
+    # =====================================================
+    # CLASS STATISTICS
+    # =====================================================
+
+    class_stats = []
+
+
+    for g in [
+        "9",
+        "10",
+        "11",
+        "12"
+    ]:
+
+        for c in [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+        ]:
+
+
+            total_c = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM students
+                WHERE grade=?
+                AND class_name=?
+                """,
+                (g, c)
+            ).fetchone()[0]
+
+
+            boys = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM students
+
+                WHERE grade=?
+
+                AND class_name=?
+
+                AND gender IN (
+                    'Male',
+                    'male',
+                    'Dhiira',
+                    'ወንድ'
+                )
+                """,
+                (g, c)
+            ).fetchone()[0]
+
+
+            girls = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM students
+
+                WHERE grade=?
+
+                AND class_name=?
+
+                AND gender IN (
+                    'Female',
+                    'female',
+                    'Dubartii',
+                    'ሴት'
+                )
+                """,
+                (g, c)
+            ).fetchone()[0]
+
+
+            class_stats.append({
+
+                "grade": g,
+
+                "class": c,
+
+                "total": total_c,
+
+                "boys": boys,
+
+                "girls": girls
+
+            })
+
+
+    # =====================================================
+    # FILTERED STUDENTS
+    # =====================================================
 
     query = """
+
         SELECT *
+
         FROM students
-        WHERE 1 = 1
+
+        WHERE 1=1
+
     """
+
 
     params = []
 
 
-    if grade_filter:
+    if grade:
 
-        query += " AND grade = ?"
-        params.append(grade_filter)
+        query += """
+            AND grade=?
+        """
 
-
-    if class_filter:
-
-        query += " AND class_name = ?"
-        params.append(class_filter)
-
-
-    if gender_filter:
-
-        query += " AND gender = ?"
-        params.append(gender_filter)
+        params.append(
+            grade
+        )
 
 
-    if status_filter:
+    if class_name:
 
-        query += " AND status = ?"
-        params.append(status_filter)
+        query += """
+            AND class_name=?
+        """
+
+        params.append(
+            class_name
+        )
+
+
+    if status:
+
+        query += """
+            AND status=?
+        """
+
+        params.append(
+            status
+        )
 
 
     if search:
 
         query += """
+
             AND (
+
                 full_name LIKE ?
-                OR phone LIKE ?
-                OR registration_code LIKE ?
+
                 OR national_id LIKE ?
+
+                OR phone LIKE ?
+
+                OR registration_code LIKE ?
+
             )
+
         """
 
-        search_value = "%" + search + "%"
+        term = (
+            "%"
+            + search
+            + "%"
+        )
 
         params.extend([
-            search_value,
-            search_value,
-            search_value,
-            search_value
+            term,
+            term,
+            term,
+            term
         ])
 
 
     query += """
-        ORDER BY id DESC
+
+        ORDER BY
+            full_name COLLATE NOCASE ASC
+
     """
 
 
@@ -3026,1003 +3698,936 @@ def admin_dashboard():
     ).fetchall()
 
 
-    # --------------------------------------------------------
-    # OVERALL STATISTICS
-    # --------------------------------------------------------
-
-    total = conn.execute(
-        "SELECT COUNT(*) FROM students"
-    ).fetchone()[0]
-
-
-    pending = conn.execute(
-        "SELECT COUNT(*) FROM students WHERE status='pending'"
-    ).fetchone()[0]
-
-
-    approved = conn.execute(
-        "SELECT COUNT(*) FROM students WHERE status='approved'"
-    ).fetchone()[0]
-
-
-    rejected = conn.execute(
-        "SELECT COUNT(*) FROM students WHERE status='rejected'"
-    ).fetchone()[0]
-
-
-    # --------------------------------------------------------
-    # GRADE / CLASS / GENDER STATISTICS
-    # --------------------------------------------------------
-
-    statistics = {}
-
-
-    for grade in GRADES:
-
-        statistics[grade] = {}
-
-
-        for class_name in CLASSES:
-
-            boys = conn.execute("""
-                SELECT COUNT(*)
-                FROM students
-                WHERE grade = ?
-                AND class_name = ?
-                AND gender = 'Male'
-            """, (
-                grade,
-                class_name
-            )).fetchone()[0]
-
-
-            girls = conn.execute("""
-                SELECT COUNT(*)
-                FROM students
-                WHERE grade = ?
-                AND class_name = ?
-                AND gender = 'Female'
-            """, (
-                grade,
-                class_name
-            )).fetchone()[0]
-
-
-            total_class = boys + girls
-
-
-            statistics[grade][class_name] = {
-                "boys": boys,
-                "girls": girls,
-                "total": total_class
-            }
-
-
     conn.close()
 
 
-    content = """
+    body = """
 
-<section class="section">
+    <div class="card">
 
-<div class="container">
+        <div class="section-title">
 
-<div class="section-title">
+            <div>
 
-<h2>
-    {{ t.dashboard }}
-</h2>
+                <p class="muted">
+                    AMBUYEE • STAFF
+                </p>
 
-<p>
-    Teacher / Administration Control Center
-</p>
+                <h1>
+                    {{ t('teacher_dashboard') }}
+                </h1>
 
-</div>
+            </div>
 
 
-<div class="stats">
+            <a
+                class="btn dark"
+                href="{{ url_for('teacher_logout') }}"
+            >
+                {{ t('logout') }}
+            </a>
 
+        </div>
 
-<div class="stat">
 
-<div class="stat-number">
-    {{ total }}
-</div>
+        <div class="grid">
 
-<div class="stat-label">
-    {{ t.total }}
-</div>
+            <div class="stat">
 
-</div>
+                <h3>
+                    {{ t('total_students') }}
+                </h3>
 
+                <strong>
+                    {{ total }}
+                </strong>
 
-<div class="stat">
+            </div>
 
-<div class="stat-number">
-    {{ pending }}
-</div>
 
-<div class="stat-label">
-    {{ t.pending }}
-</div>
+            <div class="stat">
 
-</div>
+                <h3>
+                    {{ t('total_pending') }}
+                </h3>
 
+                <strong>
+                    {{ pending }}
+                </strong>
 
-<div class="stat">
+            </div>
 
-<div class="stat-number">
-    {{ approved }}
-</div>
 
-<div class="stat-label">
-    {{ t.approved }}
-</div>
+            <div class="stat">
 
-</div>
+                <h3>
+                    {{ t('total_approved') }}
+                </h3>
 
+                <strong>
+                    {{ approved }}
+                </strong>
 
-<div class="stat">
+            </div>
 
-<div class="stat-number">
-    {{ rejected }}
-</div>
 
-<div class="stat-label">
-    {{ t.rejected }}
-</div>
+            <div class="stat">
 
-</div>
+                <h3>
+                    {{ t('total_rejected') }}
+                </h3>
 
+                <strong>
+                    {{ rejected }}
+                </strong>
 
-</div>
+            </div>
 
 
-<div class="card">
+            <div class="stat">
 
-<h2 style="margin-bottom:20px;">
-    {{ t.statistics }}
-</h2>
+                <h3>
+                    {{ t('total_returned') }}
+                </h3>
 
+                <strong>
+                    {{ returned }}
+                </strong>
 
-<div class="grade-stat-grid">
+            </div>
 
+        </div>
 
-{% for grade in grades %}
+    </div>
 
-<div class="grade-box">
 
-<h3>
-    Grade {{ grade }}
-</h3>
+    <!-- CLASS STATISTICS -->
 
+    <div class="card">
 
-{% for class_name in classes %}
+        <div class="section-title">
 
-<div class="class-row">
+            <h2>
+                {{ t('class_statistics') }}
+            </h2>
 
-<span>
-    Class {{ class_name }}
-</span>
+            <span class="muted">
+                Grade 9 — 12
+            </span>
 
-<span>
-    {{ statistics[grade][class_name]["total"] }}
-    |
-    {{ t.boys }}:
-    {{ statistics[grade][class_name]["boys"] }}
-    |
-    {{ t.girls }}:
-    {{ statistics[grade][class_name]["girls"] }}
-</span>
+        </div>
 
-</div>
 
-{% endfor %}
+        <div class="table-wrap">
 
-</div>
+            <table>
 
-{% endfor %}
+                <thead>
 
+                    <tr>
 
-</div>
+                        <th>
+                            {{ t('grade') }}
+                        </th>
 
-</div>
+                        <th>
+                            {{ t('class') }}
+                        </th>
 
+                        <th>
+                            {{ t('count') }}
+                        </th>
 
-<div class="card" style="margin-top:25px;">
+                        <th>
+                            {{ t('boys') }}
+                        </th>
 
-<h2 style="margin-bottom:20px;">
-    {{ t.filter }}
-</h2>
+                        <th>
+                            {{ t('girls') }}
+                        </th>
 
+                        <th>
+                            PDF
+                        </th>
 
-<form method="GET">
+                    </tr>
 
-<div class="filters">
+                </thead>
 
 
-<input
-    type="text"
-    name="search"
-    value="{{ search }}"
-    placeholder="{{ t.search }}"
->
+                <tbody>
 
+                {% for row in class_stats %}
 
-<select name="grade">
+                    <tr>
 
-<option value="">
-    All Grades
-</option>
+                        <td>
+                            Grade {{ row.grade }}
+                        </td>
 
-{% for grade in grades %}
+                        <td>
+                            Class {{ row.class }}
+                        </td>
 
-<option
-    value="{{ grade }}"
-    {% if grade_filter == grade %}
-        selected
-    {% endif %}
->
-    Grade {{ grade }}
-</option>
+                        <td>
+                            <strong>
+                                {{ row.total }}
+                            </strong>
+                        </td>
 
-{% endfor %}
+                        <td>
+                            {{ row.boys }}
+                        </td>
 
-</select>
+                        <td>
+                            {{ row.girls }}
+                        </td>
 
+                        <td>
 
-<select name="class_name">
+                            <a
+                                class="btn"
+                                href="{{ url_for(
+                                    'teacher_pdf',
+                                    grade=row.grade,
+                                    class_name=row.class
+                                ) }}"
+                            >
+                                PDF
+                            </a>
 
-<option value="">
-    All Classes
-</option>
+                        </td>
 
-{% for c in classes %}
+                    </tr>
 
-<option
-    value="{{ c }}"
-    {% if class_filter == c %}
-        selected
-    {% endif %}
->
-    Class {{ c }}
-</option>
+                {% endfor %}
 
-{% endfor %}
+                </tbody>
 
-</select>
+            </table>
 
+        </div>
 
-<select name="gender">
+    </div>
 
-<option value="">
-    All Gender
-</option>
 
-<option
-    value="Male"
-    {% if gender_filter == "Male" %}
-        selected
-    {% endif %}
->
-    {{ t.male }}
-</option>
+    <!-- FILTER -->
 
-<option
-    value="Female"
-    {% if gender_filter == "Female" %}
-        selected
-    {% endif %}
->
-    {{ t.female }}
-</option>
+    <div class="card">
 
-</select>
+        <h2>
+            {{ t('filter') }}
+        </h2>
 
 
-<select name="status">
+        <form method="GET">
 
-<option value="">
-    All Status
-</option>
+            <div class="grid">
 
-<option
-    value="pending"
-    {% if status_filter == "pending" %}
-        selected
-    {% endif %}
->
-    {{ t.pending }}
-</option>
+                <div>
 
-<option
-    value="approved"
-    {% if status_filter == "approved" %}
-        selected
-    {% endif %}
->
-    {{ t.approved }}
-</option>
+                    <label>
+                        {{ t('select_grade') }}
+                    </label>
 
-<option
-    value="rejected"
-    {% if status_filter == "rejected" %}
-        selected
-    {% endif %}
->
-    {{ t.rejected }}
-</option>
+                    <select name="grade">
 
-</select>
+                        <option value="">
+                            {{ t('all') }}
+                        </option>
 
+                        {% for g in [
+                            '9',
+                            '10',
+                            '11',
+                            '12'
+                        ] %}
 
-<button
-    class="btn btn-primary"
-    type="submit"
->
-    {{ t.search }}
-</button>
+                            <option
+                                value="{{ g }}"
+                                {% if grade == g %}
+                                    selected
+                                {% endif %}
+                            >
+                                Grade {{ g }}
+                            </option>
 
+                        {% endfor %}
 
-</div>
+                    </select>
 
-</form>
+                </div>
 
-</div>
 
+                <div>
 
-<div class="card" style="margin-top:25px;">
+                    <label>
+                        {{ t('select_class') }}
+                    </label>
 
-<h2 style="margin-bottom:20px;">
-    {{ t.register }}
-</h2>
+                    <select name="class_name">
 
+                        <option value="">
+                            {{ t('all') }}
+                        </option>
 
-<div class="table-wrapper">
+                        {% for c in [
+                            'A',
+                            'B',
+                            'C',
+                            'D',
+                            'E',
+                            'F'
+                        ] %}
 
-<table>
+                            <option
+                                value="{{ c }}"
+                                {% if class_name == c %}
+                                    selected
+                                {% endif %}
+                            >
+                                Class {{ c }}
+                            </option>
 
-<thead>
+                        {% endfor %}
 
-<tr>
+                    </select>
 
-<th>ID</th>
+                </div>
 
-<th>
-    {{ t.student_code }}
-</th>
 
-<th>
-    {{ t.full_name }}
-</th>
+                <div>
 
-<th>
-    {{ t.phone }}
-</th>
+                    <label>
+                        {{ t('select_status') }}
+                    </label>
 
-<th>
-    {{ t.grade }}
-</th>
+                    <select name="status">
 
-<th>
-    {{ t.class_name }}
-</th>
+                        <option value="">
+                            {{ t('all') }}
+                        </option>
 
-<th>
-    {{ t.gender }}
-</th>
+                        <option
+                            value="pending"
+                            {% if status == 'pending' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('pending') }}
+                        </option>
 
-<th>
-    {{ t.status }}
-</th>
+                        <option
+                            value="approved"
+                            {% if status == 'approved' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('approved') }}
+                        </option>
 
-<th>
-    Action
-</th>
+                        <option
+                            value="rejected"
+                            {% if status == 'rejected' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('rejected') }}
+                        </option>
 
-</tr>
+                        <option
+                            value="returned"
+                            {% if status == 'returned' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('returned') }}
+                        </option>
 
-</thead>
+                    </select>
 
+                </div>
 
-<tbody>
+            </div>
 
 
-{% for student in students %}
+            <label>
+                {{ t('search') }}
+            </label>
 
-<tr>
+            <input
+                name="search"
+                value="{{ search }}"
+                placeholder="Name / National ID / Phone / Registration Code"
+            >
 
-<td>
-    {{ student["id"] }}
-</td>
 
-<td>
-    {{ student["registration_code"] }}
-</td>
+            <button
+                class="btn"
+                type="submit"
+            >
+                {{ t('search') }}
+            </button>
 
-<td>
-    {{ student["full_name"] }}
-</td>
 
-<td>
-    {{ student["phone"] }}
-</td>
+            <a
+                class="btn dark"
+                href="{{ url_for('teacher_dashboard') }}"
+            >
+                Reset
+            </a>
 
-<td>
-    {{ student["grade"] }}
-</td>
+        </form>
 
-<td>
-    {{ student["class_name"] }}
-</td>
+    </div>
 
-<td>
-    {{ student["gender"] }}
-</td>
 
-<td>
+    <!-- STUDENT LIST -->
 
-<span class="badge badge-{{ student['status'] }}">
-    {{ student["status"] }}
-</span>
+    <div class="card">
 
-</td>
+        <div class="section-title">
 
-<td>
+            <div>
 
-<a
-    class="btn btn-dark"
-    href="{{ url_for('admin_student_detail', student_id=student['id']) }}"
->
-    View
-</a>
+                <h2>
+                    {{ t('students_by_class') }}
+                </h2>
 
-</td>
+                <p class="muted">
+                    {{ students|length }}
+                    students • alphabetical order
+                </p>
 
-</tr>
+            </div>
 
-{% else %}
+        </div>
 
-<tr>
 
-<td colspan="9">
+        <div class="table-wrap">
 
-{{ t.no_students }}
+            <table>
 
-</td>
+                <thead>
 
-</tr>
+                    <tr>
 
-{% endfor %}
+                        <th>#</th>
 
+                        <th>
+                            {{ t('full_name') }}
+                        </th>
 
-</tbody>
+                        <th>
+                            {{ t('national_id') }}
+                        </th>
 
-</table>
+                        <th>
+                            {{ t('gender') }}
+                        </th>
 
-</div>
+                        <th>
+                            {{ t('phone') }}
+                        </th>
 
-</div>
+                        <th>
+                            {{ t('grade') }}
+                        </th>
 
+                        <th>
+                            {{ t('class') }}
+                        </th>
 
-<div class="buttons">
+                        <th>
+                            {{ t('status') }}
+                        </th>
 
-<a
-    href="{{ url_for('admin_logout') }}"
-    class="btn btn-dark"
->
-    {{ t.logout }}
-</a>
+                        <th>
+                            {{ t('view') }}
+                        </th>
 
-</div>
+                    </tr>
 
+                </thead>
 
-</div>
 
-</section>
+                <tbody>
 
-"""
+                {% for student in students %}
 
-    return render_page(
-        content,
-        title=LANG[current_lang()]["dashboard"],
-        students=students,
-        total=total,
-        pending=pending,
-        approved=approved,
-        rejected=rejected,
-        grades=GRADES,
-        classes=CLASSES,
-        statistics=statistics,
-        grade_filter=grade_filter,
-        class_filter=class_filter,
-        gender_filter=gender_filter,
-        status_filter=status_filter,
-        search=search
+                    <tr>
+
+                        <td>
+                            {{ loop.index }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ student['full_name'] }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ student['national_id'] }}
+                        </td>
+
+                        <td>
+                            {{ student['gender'] }}
+                        </td>
+
+                        <td>
+                            {{ student['phone'] }}
+                        </td>
+
+                        <td>
+                            {{ student['grade'] }}
+                        </td>
+
+                        <td>
+                            {{ student['class_name'] }}
+                        </td>
+
+                        <td>
+
+                            <span
+                                class="badge
+                                {{ student['status'] }}"
+                            >
+                                {{ status_text(
+                                    student['status']
+                                ) }}
+                            </span>
+
+                        </td>
+
+                        <td>
+
+                            <a
+                                class="btn"
+                                href="{{ url_for(
+                                    'teacher_student',
+                                    student_id=student['id']
+                                ) }}"
+                            >
+                                {{ t('view') }}
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="9">
+
+                            {{ t('no_students') }}
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    """
+
+
+    return page(
+
+        t("teacher_dashboard"),
+
+        render_template_string(
+
+            body,
+
+            total=total,
+
+            pending=pending,
+
+            approved=approved,
+
+            rejected=rejected,
+
+            returned=returned,
+
+            class_stats=class_stats,
+
+            students=students,
+
+            grade=grade,
+
+            class_name=class_name,
+
+            status=status,
+
+            search=search
+
+        )
+
     )
 
 
-# ============================================================
-# ADMIN STUDENT DETAIL
-# ============================================================
+# =========================================================
+# TEACHER STUDENT DETAIL
+# =========================================================
 
-@app.route("/admin/student/<int:student_id>")
-@admin_required
-def admin_student_detail(student_id):
+@app.route(
+    "/teacher/student/<int:student_id>"
+)
+@teacher_required
+def teacher_student(student_id):
 
     conn = get_db()
 
+
     student = conn.execute(
-        "SELECT * FROM students WHERE id = ?",
+        """
+        SELECT *
+        FROM students
+        WHERE id=?
+        """,
         (student_id,)
     ).fetchone()
+
 
     conn.close()
 
 
     if not student:
+
         abort(404)
 
 
-    content = """
+    body = """
 
-<section class="section">
+    <div class="card">
 
-<div class="container">
+        <div class="section-title">
 
-<div class="section-title">
+            <div>
 
-<h2>
-    {{ t.student_details }}
-</h2>
+                <p class="muted">
+                    {{ t('student_details') }}
+                </p>
 
-<p>
-    {{ student["registration_code"] }}
-</p>
+                <h1>
+                    {{ student['full_name'] }}
+                </h1>
 
-</div>
+            </div>
 
+            <span
+                class="badge
+                {{ student['status'] }}"
+            >
+                {{ status_text(
+                    student['status']
+                ) }}
+            </span>
 
-<div class="card">
+        </div>
 
 
-<div class="detail-grid">
+        <div class="grid">
 
+            <div>
 
-<div class="detail-item">
+                <p>
+                    <strong>
+                        {{ t('registration_code') }}:
+                    </strong>
+                    {{ student['registration_code'] }}
+                </p>
 
-<span>
-    {{ t.full_name }}
-</span>
+                <p>
+                    <strong>
+                        {{ t('phone') }}:
+                    </strong>
+                    {{ student['phone'] }}
+                </p>
 
-<strong>
-    {{ student["full_name"] }}
-</strong>
+                <p>
+                    <strong>
+                        {{ t('national_id') }}:
+                    </strong>
+                    {{ student['national_id'] }}
+                </p>
 
-</div>
+                <p>
+                    <strong>
+                        {{ t('age') }}:
+                    </strong>
+                    {{ student['age'] }}
+                </p>
 
+            </div>
 
-<div class="detail-item">
 
-<span>
-    {{ t.phone }}
-</span>
+            <div>
 
-<strong>
-    {{ student["phone"] }}
-</strong>
+                <p>
+                    <strong>
+                        {{ t('gender') }}:
+                    </strong>
+                    {{ student['gender'] }}
+                </p>
 
-</div>
+                <p>
+                    <strong>
+                        {{ t('grade') }}:
+                    </strong>
+                    {{ student['grade'] }}
+                </p>
 
+                <p>
+                    <strong>
+                        {{ t('class') }}:
+                    </strong>
+                    {{ student['class_name'] }}
+                </p>
 
-<div class="detail-item">
+                <p>
+                    <strong>
+                        {{ t('stream') }}:
+                    </strong>
+                    {{ student['stream'] or '-' }}
+                </p>
 
-<span>
-    {{ t.national_id }}
-</span>
+            </div>
 
-<strong>
-    {{ student["national_id"] }}
-</strong>
+        </div>
 
-</div>
+    </div>
 
 
-<div class="detail-item">
+    <!-- FACE -->
 
-<span>
-    {{ t.age }}
-</span>
+    <div class="card">
 
-<strong>
-    {{ student["age"] }}
-</strong>
+        <h2>
+            {{ t('face_photo') }}
+        </h2>
 
-</div>
+        <img
+            class="preview"
+            src="{{ url_for(
+                'uploaded_file',
+                filename=student['face_photo']
+            ) }}"
+        >
 
+    </div>
 
-<div class="detail-item">
 
-<span>
-    {{ t.gender }}
-</span>
+    <!-- DOCUMENTS -->
 
-<strong>
-    {{ student["gender"] }}
-</strong>
+    <div class="card">
 
-</div>
+        <h2>
+            Documents
+        </h2>
 
 
-<div class="detail-item">
+        <a
+            class="btn"
+            href="{{ url_for(
+                'uploaded_file',
+                filename=student['card_front']
+            ) }}"
+            target="_blank"
+        >
+            {{ t('card_front') }}
+        </a>
 
-<span>
-    {{ t.kebele }}
-</span>
 
-<strong>
-    {{ student["kebele"] }}
-</strong>
+        <a
+            class="btn"
+            href="{{ url_for(
+                'uploaded_file',
+                filename=student['card_back']
+            ) }}"
+            target="_blank"
+        >
+            {{ t('card_back') }}
+        </a>
 
-</div>
 
+        {% if student['ministry_document'] %}
 
-<div class="detail-item">
+            <a
+                class="btn"
+                href="{{ url_for(
+                    'uploaded_file',
+                    filename=student['ministry_document']
+                ) }}"
+                target="_blank"
+            >
+                {{ t('ministry_document') }}
+            </a>
 
-<span>
-    {{ t.zone }}
-</span>
+        {% endif %}
 
-<strong>
-    {{ student["zone"] }}
-</strong>
 
-</div>
+        {% if student['payment_screenshot'] %}
 
+            <a
+                class="btn"
+                href="{{ url_for(
+                    'uploaded_file',
+                    filename=student['payment_screenshot']
+                ) }}"
+                target="_blank"
+            >
+                {{ t('payment') }}
+            </a>
 
-<div class="detail-item">
+        {% endif %}
 
-<span>
-    {{ t.grade }}
-</span>
+    </div>
 
-<strong>
-    Grade {{ student["grade"] }}
-</strong>
 
-</div>
+    <!-- STATUS -->
 
+    <div class="card">
 
-<div class="detail-item">
+        <h2>
+            Update Student Status
+        </h2>
 
-<span>
-    {{ t.class_name }}
-</span>
 
-<strong>
-    Class {{ student["class_name"] }}
-</strong>
+        <form
+            method="POST"
+            action="{{ url_for(
+                'teacher_update_student',
+                student_id=student['id']
+            ) }}"
+        >
 
-</div>
+            <button
+                class="btn green"
+                name="status"
+                value="approved"
+            >
+                {{ t('approve') }}
+            </button>
 
 
-<div class="detail-item">
+            <button
+                class="btn red"
+                name="status"
+                value="rejected"
+            >
+                {{ t('reject') }}
+            </button>
 
-<span>
-    {{ t.stream }}
-</span>
 
-<strong>
-    {{ student["stream"] or "-" }}
-</strong>
+            <button
+                class="btn orange"
+                name="status"
+                value="returned"
+            >
+                {{ t('return') }}
+            </button>
 
-</div>
+        </form>
 
+    </div>
 
-<div class="detail-item">
 
-<span>
-    {{ t.registration_date }}
-</span>
+    <!-- MESSAGE -->
 
-<strong>
-    {{ student["created_at"] }}
-</strong>
+    <div class="card">
 
-</div>
+        <h2>
+            {{ t('message') }}
+        </h2>
 
 
-<div class="detail-item">
+        {% if student['teacher_message'] %}
 
-<span>
-    {{ t.status }}
-</span>
+            <div class="alert">
+                {{ student['teacher_message'] }}
+            </div>
 
-<strong>
-    {{ student["status"] }}
-</strong>
+        {% endif %}
 
-</div>
 
+        <form
+            method="POST"
+            action="{{ url_for(
+                'teacher_message',
+                student_id=student['id']
+            ) }}"
+        >
 
-</div>
+            <textarea
+                name="message"
+                placeholder="Write a message to the student..."
+                required
+            ></textarea>
 
 
-<h2 style="margin-top:30px;">
-    Documents
-</h2>
+            <button
+                class="btn"
+                type="submit"
+            >
+                {{ t('send_message') }}
+            </button>
 
+        </form>
 
-<div class="document-grid">
+    </div>
 
 
-<div class="document-card">
+    <a
+        class="btn dark"
+        href="{{ url_for('teacher_dashboard') }}"
+    >
+        ← {{ t('teacher_dashboard') }}
+    </a>
 
-<h4>
-    {{ t.face_photo }}
-</h4>
+    """
 
-<br>
 
-<img
-    src="{{ url_for('uploaded_file', filename=student['face_photo']) }}"
->
+    return page(
 
-</div>
+        t("student_details"),
 
+        render_template_string(
+            body,
+            student=student
+        )
 
-<div class="document-card">
-
-<h4>
-    {{ t.school_card_front }}
-</h4>
-
-<br>
-
-{% if student["card_front"].lower().endswith(".pdf") %}
-
-<iframe
-    src="{{ url_for('uploaded_file', filename=student['card_front']) }}"
-></iframe>
-
-{% else %}
-
-<img
-    src="{{ url_for('uploaded_file', filename=student['card_front']) }}"
->
-
-{% endif %}
-
-</div>
-
-
-<div class="document-card">
-
-<h4>
-    {{ t.school_card_back }}
-</h4>
-
-<br>
-
-{% if student["card_back"].lower().endswith(".pdf") %}
-
-<iframe
-    src="{{ url_for('uploaded_file', filename=student['card_back']) }}"
-></iframe>
-
-{% else %}
-
-<img
-    src="{{ url_for('uploaded_file', filename=student['card_back']) }}"
->
-
-{% endif %}
-
-</div>
-
-
-{% if student["ministry_document"] %}
-
-<div class="document-card">
-
-<h4>
-    {{ t.ministry_document }}
-</h4>
-
-<br>
-
-{% if student["ministry_document"].lower().endswith(".pdf") %}
-
-<iframe
-    src="{{ url_for('uploaded_file', filename=student['ministry_document']) }}"
-></iframe>
-
-{% else %}
-
-<img
-    src="{{ url_for('uploaded_file', filename=student['ministry_document']) }}"
->
-
-{% endif %}
-
-</div>
-
-{% endif %}
-
-
-{% if student["payment_screenshot"] %}
-
-<div class="document-card">
-
-<h4>
-    {{ t.payment_screenshot }}
-</h4>
-
-<br>
-
-{% if student["payment_screenshot"].lower().endswith(".pdf") %}
-
-<iframe
-    src="{{ url_for('uploaded_file', filename=student['payment_screenshot']) }}"
-></iframe>
-
-{% else %}
-
-<img
-    src="{{ url_for('uploaded_file', filename=student['payment_screenshot']) }}"
->
-
-{% endif %}
-
-</div>
-
-{% endif %}
-
-
-</div>
-
-
-<div class="card" style="margin-top:25px;">
-
-<h3>
-    {{ t.status }}
-</h3>
-
-
-<form
-    method="POST"
-    action="{{ url_for('admin_update_student', student_id=student['id']) }}"
->
-
-<div class="buttons"
-     style="justify-content:flex-start;">
-
-<button
-    name="action"
-    value="approved"
-    class="btn btn-success"
->
-    {{ t.approve }}
-</button>
-
-
-<button
-    name="action"
-    value="rejected"
-    class="btn btn-danger"
->
-    {{ t.reject }}
-</button>
-
-
-<button
-    name="action"
-    value="returned"
-    class="btn btn-warning"
->
-    {{ t.return }}
-</button>
-
-</div>
-
-</form>
-
-
-<form
-    method="POST"
-    action="{{ url_for('admin_send_message', student_id=student['id']) }}"
-    style="margin-top:20px;"
->
-
-<div class="form-group">
-
-<label>
-    {{ t.message }}
-</label>
-
-<textarea
-    name="message"
-    placeholder="{{ t.message }}"
-></textarea>
-
-</div>
-
-
-<button
-    class="btn btn-primary"
-    style="margin-top:12px;"
->
-    {{ t.send_message }}
-</button>
-
-</form>
-
-
-{% if student["teacher_message"] %}
-
-<div class="alert" style="margin-top:20px;">
-
-<strong>
-    {{ t.message }}
-</strong>
-
-<br><br>
-
-{{ student["teacher_message"] }}
-
-</div>
-
-{% endif %}
-
-
-</div>
-
-
-<div class="buttons">
-
-<a
-    class="btn btn-dark"
-    href="{{ url_for('admin_dashboard') }}"
->
-    {{ t.dashboard }}
-</a>
-
-</div>
-
-
-</div>
-
-</div>
-
-</section>
-
-"""
-
-    return render_page(
-        content,
-        title=LANG[current_lang()]["student_details"],
-        student=student
     )
 
 
-# ============================================================
-# ADMIN UPDATE STUDENT STATUS
-# ============================================================
+# =========================================================
+# TEACHER UPDATE STATUS
+# =========================================================
 
 @app.route(
-    "/admin/student/<int:student_id>/update",
+    "/teacher/student/<int:student_id>/update",
     methods=["POST"]
 )
-@admin_required
-def admin_update_student(student_id):
+@teacher_required
+def teacher_update_student(student_id):
 
-    action = request.form.get(
-        "action",
+    new_status = request.form.get(
+        "status",
         ""
     ).strip()
 
 
-    if action not in [
+    if new_status not in [
         "approved",
         "rejected",
         "returned"
@@ -4031,52 +4636,53 @@ def admin_update_student(student_id):
         abort(400)
 
 
-    now = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-
     conn = get_db()
 
-    conn.execute("""
+
+    conn.execute(
+        """
+
         UPDATE students
+
         SET
-            status = ?,
-            updated_at = ?
-        WHERE id = ?
-    """, (
-        action,
-        now,
-        student_id
-    ))
+            status=?,
+            updated_at=?
+
+        WHERE id=?
+
+        """,
+
+        (
+            new_status,
+            datetime.now().isoformat(),
+            student_id
+        )
+    )
+
 
     conn.commit()
+
     conn.close()
-
-
-    flash(
-        LANG[current_lang()]["saved"]
-    )
 
 
     return redirect(
         url_for(
-            "admin_student_detail",
+            "teacher_student",
             student_id=student_id
         )
     )
 
 
-# ============================================================
-# ADMIN SEND MESSAGE
-# ============================================================
+# =========================================================
+# TEACHER MESSAGE
+# =========================================================
 
 @app.route(
-    "/admin/student/<int:student_id>/message",
+    "/teacher/student/<int:student_id>/message",
     methods=["POST"]
 )
-@admin_required
-def admin_send_message(student_id):
+@teacher_required
+def teacher_message(student_id):
 
     message = request.form.get(
         "message",
@@ -4086,225 +4692,1735 @@ def admin_send_message(student_id):
 
     if not message:
 
+        flash(
+            "Message cannot be empty."
+        )
+
         return redirect(
             url_for(
-                "admin_student_detail",
+                "teacher_student",
                 student_id=student_id
             )
         )
 
 
-    now = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-
     conn = get_db()
 
-    conn.execute("""
+
+    conn.execute(
+        """
+
         UPDATE students
+
         SET
-            teacher_message = ?,
-            updated_at = ?
-        WHERE id = ?
-    """, (
-        message,
-        now,
-        student_id
-    ))
+            teacher_message=?,
+            updated_at=?
+
+        WHERE id=?
+
+        """,
+
+        (
+            message,
+            datetime.now().isoformat(),
+            student_id
+        )
+    )
+
 
     conn.commit()
+
     conn.close()
-
-
-    flash(
-        LANG[current_lang()]["saved"]
-    )
 
 
     return redirect(
         url_for(
-            "admin_student_detail",
+            "teacher_student",
             student_id=student_id
         )
     )
 
 
-# ============================================================
-# PROTECTED UPLOAD VIEW
-# ============================================================
+# =========================================================
+# TEACHER PDF
+# =========================================================
 
-@app.route("/uploads/<path:filename>")
-def uploaded_file(filename):
+@app.route("/teacher/pdf")
+@teacher_required
+def teacher_pdf():
 
-    # Student only sees own documents indirectly through
-    # their dashboard; admin can see documents after login.
-    #
-    # This route intentionally does NOT expose uploads publicly
-    # without authentication.
+    grade = request.args.get(
+        "grade",
+        ""
+    ).strip()
 
-    if not session.get("admin_logged_in") and not session.get("student_id"):
-        abort(403)
+    class_name = request.args.get(
+        "class_name",
+        ""
+    ).strip()
 
 
-    safe_name = os.path.basename(filename)
+    if grade not in [
+        "9",
+        "10",
+        "11",
+        "12"
+    ]:
 
-    return send_from_directory(
-        UPLOAD_FOLDER,
-        safe_name
+        abort(400)
+
+
+    if class_name not in [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F"
+    ]:
+
+        abort(400)
+
+
+    conn = get_db()
+
+
+    students = conn.execute(
+        """
+
+        SELECT *
+
+        FROM students
+
+        WHERE grade=?
+
+        AND class_name=?
+
+        ORDER BY
+            full_name COLLATE NOCASE ASC
+
+        """,
+
+        (
+            grade,
+            class_name
+        )
+
+    ).fetchall()
+
+
+    conn.close()
+
+
+    try:
+
+        from reportlab.lib import colors
+
+        from reportlab.lib.pagesizes import (
+            A4,
+            landscape
+        )
+
+        from reportlab.lib.styles import (
+            getSampleStyleSheet
+        )
+
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Table,
+            TableStyle,
+            Paragraph,
+            Spacer
+        )
+
+        from reportlab.lib.enums import (
+            TA_CENTER
+        )
+
+    except ImportError:
+
+        flash(
+            "ReportLab is not installed."
+        )
+
+        return redirect(
+            url_for("teacher_dashboard")
+        )
+
+
+    pdf_name = (
+        "Ambuyyee_Grade_"
+        + grade
+        + "_Class_"
+        + class_name
+        + ".pdf"
     )
 
 
-# ============================================================
-# ADMIN LOGOUT
-# ============================================================
+    pdf_path = os.path.join(
+        UPLOAD_DIR,
+        pdf_name
+    )
 
-@app.route("/admin/logout")
-def admin_logout():
 
-    session.clear()
+    doc = SimpleDocTemplate(
+
+        pdf_path,
+
+        pagesize=landscape(A4),
+
+        rightMargin=25,
+
+        leftMargin=25,
+
+        topMargin=25,
+
+        bottomMargin=25
+
+    )
+
+
+    styles = getSampleStyleSheet()
+
+
+    title_style = styles["Title"]
+
+    title_style.alignment = TA_CENTER
+
+
+    elements = []
+
+
+    elements.append(
+
+        Paragraph(
+            "Mana Barumsaa Sadarkaa 2ffaa Ambuyyee",
+            title_style
+        )
+
+    )
+
+
+    elements.append(
+
+        Paragraph(
+
+            "Student List - Grade "
+            + grade
+            + " - Class "
+            + class_name,
+
+            styles["Heading2"]
+
+        )
+
+    )
+
+
+    elements.append(
+        Spacer(1, 15)
+    )
+
+
+    data = [[
+
+        "#",
+
+        "Full Name",
+
+        "National ID",
+
+        "Gender",
+
+        "Phone",
+
+        "Grade",
+
+        "Class",
+
+        "Status"
+
+    ]]
+
+
+    for index, student in enumerate(
+        students,
+        start=1
+    ):
+
+        data.append([
+
+            str(index),
+
+            student["full_name"],
+
+            student["national_id"],
+
+            student["gender"],
+
+            student["phone"],
+
+            student["grade"],
+
+            student["class_name"],
+
+            student["status"]
+
+        ])
+
+
+    table = Table(
+        data,
+        repeatRows=1
+    )
+
+
+    table.setStyle(
+
+        TableStyle([
+
+            (
+                "BACKGROUND",
+                (0, 0),
+                (-1, 0),
+                colors.HexColor("#16283f")
+            ),
+
+            (
+                "TEXTCOLOR",
+                (0, 0),
+                (-1, 0),
+                colors.white
+            ),
+
+            (
+                "FONTNAME",
+                (0, 0),
+                (-1, 0),
+                "Helvetica-Bold"
+            ),
+
+            (
+                "GRID",
+                (0, 0),
+                (-1, -1),
+                0.5,
+                colors.grey
+            ),
+
+            (
+                "VALIGN",
+                (0, 0),
+                (-1, -1),
+                "MIDDLE"
+            ),
+
+            (
+                "FONTSIZE",
+                (0, 0),
+                (-1, -1),
+                8
+            ),
+
+            (
+                "ROWBACKGROUNDS",
+                (0, 1),
+                (-1, -1),
+                [
+                    colors.white,
+                    colors.HexColor("#f1f4f7")
+                ]
+            )
+
+        ])
+
+    )
+
+
+    elements.append(
+        table
+    )
+
+
+    doc.build(
+        elements
+    )
+
+
+    return send_from_directory(
+
+        UPLOAD_DIR,
+
+        pdf_name,
+
+        as_attachment=True
+
+    )
+
+
+# =========================================================
+# TEACHER LOGOUT
+# =========================================================
+
+@app.route("/teacher/logout")
+def teacher_logout():
+
+    session.pop(
+        "teacher_logged",
+        None
+    )
 
     return redirect(
         url_for("home")
     )
 
 
-# ============================================================
-# ERROR HANDLERS
-# ============================================================
+# =========================================================
+# DIRECTOR LOGIN
+# =========================================================
 
-@app.errorhandler(404)
-def not_found(error):
+@app.route(
+    "/director/login",
+    methods=["GET", "POST"]
+)
+def director_login():
 
-    content = """
+    if request.method == "POST":
 
-<section class="section">
-
-<div class="container">
-
-<div class="form-card" style="text-align:center;">
-
-<div style="font-size:60px;">
-    404
-</div>
-
-<h1>
-    Page Not Found
-</h1>
-
-<p>
-    The requested page could not be found.
-</p>
-
-<div class="buttons">
-
-<a
-    class="btn btn-primary"
-    href="{{ url_for('home') }}"
->
-    {{ t.home }}
-</a>
-
-</div>
-
-</div>
-
-</div>
-
-</section>
-
-"""
-
-    return render_page(
-        content,
-        title="404"
-    ), 404
+        code = request.form.get(
+            "code",
+            ""
+        ).strip()
 
 
-@app.errorhandler(403)
-def forbidden(error):
+        if code != DIRECTOR_CODE:
 
-    content = """
+            flash(
+                t("wrong_code")
+            )
 
-<section class="section">
+            return redirect(
+                url_for("director_login")
+            )
 
-<div class="container">
 
-<div class="form-card" style="text-align:center;">
+        session.clear()
 
-<div style="font-size:60px;">
-    🔐
-</div>
+        session["director_logged"] = True
 
-<h1>
-    Access Denied
-</h1>
 
-<p>
-    You do not have permission to view this resource.
-</p>
+        return redirect(
+            url_for("director_dashboard")
+        )
 
-</div>
 
-</div>
+    body = """
 
-</section>
+    <div
+        class="card"
+        style="max-width:550px;margin:40px auto;"
+    >
 
-"""
+        <h1>
+            {{ t('director_login') }}
+        </h1>
 
-    return render_page(
-        content,
-        title="Access Denied"
-    ), 403
+        <p class="muted">
+            Authorized director access only.
+        </p>
 
+
+        <form method="POST">
+
+            <label>
+                Director Code
+            </label>
+
+            <input
+                type="password"
+                name="code"
+                required
+            >
+
+
+            <button
+                class="btn"
+                type="submit"
+            >
+                {{ t('login') }}
+            </button>
+
+        </form>
+
+    </div>
+
+    """
+
+
+    return page(
+        t("director_login"),
+        body
+    )
+
+
+# =========================================================
+# DIRECTOR DASHBOARD
+# =========================================================
+
+@app.route("/director/dashboard")
+@director_required
+def director_dashboard():
+
+    conn = get_db()
+
+
+    total = conn.execute(
+        "SELECT COUNT(*) FROM students"
+    ).fetchone()[0]
+
+
+    pending = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='pending'
+        """
+    ).fetchone()[0]
+
+
+    approved = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='approved'
+        """
+    ).fetchone()[0]
+
+
+    rejected = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='rejected'
+        """
+    ).fetchone()[0]
+
+
+    returned = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM students
+        WHERE status='returned'
+        """
+    ).fetchone()[0]
+
+
+    # =====================================================
+    # GRADE STATISTICS
+    # =====================================================
+
+    grade_stats = []
+
+
+    for g in [
+        "9",
+        "10",
+        "11",
+        "12"
+    ]:
+
+
+        total_g = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM students
+            WHERE grade=?
+            """,
+            (g,)
+        ).fetchone()[0]
+
+
+        boys_g = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM students
+
+            WHERE grade=?
+
+            AND gender IN (
+                'Male',
+                'male',
+                'Dhiira',
+                'ወንድ'
+            )
+            """,
+            (g,)
+        ).fetchone()[0]
+
+
+        girls_g = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM students
+
+            WHERE grade=?
+
+            AND gender IN (
+                'Female',
+                'female',
+                'Dubartii',
+                'ሴት'
+            )
+            """,
+            (g,)
+        ).fetchone()[0]
+
+
+        grade_stats.append({
+
+            "grade": g,
+
+            "total": total_g,
+
+            "boys": boys_g,
+
+            "girls": girls_g
+
+        })
+
+
+    # =====================================================
+    # CLASS STATISTICS
+    # =====================================================
+
+    class_stats = []
+
+
+    for g in [
+        "9",
+        "10",
+        "11",
+        "12"
+    ]:
+
+        for c in [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+        ]:
+
+
+            total_c = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM students
+                WHERE grade=?
+                AND class_name=?
+                """,
+                (g, c)
+            ).fetchone()[0]
+
+
+            boys = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM students
+
+                WHERE grade=?
+
+                AND class_name=?
+
+                AND gender IN (
+                    'Male',
+                    'male',
+                    'Dhiira',
+                    'ወንድ'
+                )
+                """,
+                (g, c)
+            ).fetchone()[0]
+
+
+            girls = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM students
+
+                WHERE grade=?
+
+                AND class_name=?
+
+                AND gender IN (
+                    'Female',
+                    'female',
+                    'Dubartii',
+                    'ሴት'
+                )
+                """,
+                (g, c)
+            ).fetchone()[0]
+
+
+            class_stats.append({
+
+                "grade": g,
+
+                "class": c,
+
+                "total": total_c,
+
+                "boys": boys,
+
+                "girls": girls
+
+            })
+
+
+    conn.close()
+
+
+    body = """
+
+    <div class="card">
+
+        <div class="section-title">
+
+            <div>
+
+                <p class="muted">
+                    AMBUYEE • MANAGEMENT
+                </p>
+
+                <h1>
+                    {{ t('director_dashboard') }}
+                </h1>
+
+            </div>
+
+
+            <a
+                class="btn dark"
+                href="{{ url_for('director_logout') }}"
+            >
+                {{ t('logout') }}
+            </a>
+
+        </div>
+
+
+        <div class="grid">
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('total_students') }}
+                </h3>
+
+                <strong>
+                    {{ total }}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('total_pending') }}
+                </h3>
+
+                <strong>
+                    {{ pending }}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('total_approved') }}
+                </h3>
+
+                <strong>
+                    {{ approved }}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('total_rejected') }}
+                </h3>
+
+                <strong>
+                    {{ rejected }}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <h3>
+                    {{ t('total_returned') }}
+                </h3>
+
+                <strong>
+                    {{ returned }}
+                </strong>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- GRADE STATISTICS -->
+
+    <div class="card">
+
+        <h2>
+            Grade Statistics
+        </h2>
+
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            {{ t('grade') }}
+                        </th>
+
+                        <th>
+                            {{ t('count') }}
+                        </th>
+
+                        <th>
+                            {{ t('boys') }}
+                        </th>
+
+                        <th>
+                            {{ t('girls') }}
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                {% for row in grade_stats %}
+
+                    <tr>
+
+                        <td>
+                            Grade {{ row.grade }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ row.total }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ row.boys }}
+                        </td>
+
+                        <td>
+                            {{ row.girls }}
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- CLASS STATISTICS -->
+
+    <div class="card">
+
+        <h2>
+            {{ t('class_statistics') }}
+        </h2>
+
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            {{ t('grade') }}
+                        </th>
+
+                        <th>
+                            {{ t('class') }}
+                        </th>
+
+                        <th>
+                            {{ t('count') }}
+                        </th>
+
+                        <th>
+                            {{ t('boys') }}
+                        </th>
+
+                        <th>
+                            {{ t('girls') }}
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                {% for row in class_stats %}
+
+                    <tr>
+
+                        <td>
+                            Grade {{ row.grade }}
+                        </td>
+
+                        <td>
+                            Class {{ row.class }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ row.total }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ row.boys }}
+                        </td>
+
+                        <td>
+                            {{ row.girls }}
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>
+            {{ t('student_details') }}
+        </h2>
+
+        <a
+            class="btn"
+            href="{{ url_for('director_students') }}"
+        >
+            View All Students
+        </a>
+
+    </div>
+
+    """
+
+
+    return page(
+
+        t("director_dashboard"),
+
+        render_template_string(
+
+            body,
+
+            total=total,
+
+            pending=pending,
+
+            approved=approved,
+
+            rejected=rejected,
+
+            returned=returned,
+
+            grade_stats=grade_stats,
+
+            class_stats=class_stats
+
+        )
+
+    )
+
+
+# =========================================================
+# DIRECTOR STUDENTS
+# =========================================================
+
+@app.route("/director/students")
+@director_required
+def director_students():
+
+    search = request.args.get(
+        "search",
+        ""
+    ).strip()
+
+    grade = request.args.get(
+        "grade",
+        ""
+    ).strip()
+
+    class_name = request.args.get(
+        "class_name",
+        ""
+    ).strip()
+
+    status = request.args.get(
+        "status",
+        ""
+    ).strip()
+
+
+    query = """
+
+        SELECT *
+
+        FROM students
+
+        WHERE 1=1
+
+    """
+
+
+    params = []
+
+
+    if grade:
+
+        query += """
+            AND grade=?
+        """
+
+        params.append(
+            grade
+        )
+
+
+    if class_name:
+
+        query += """
+            AND class_name=?
+        """
+
+        params.append(
+            class_name
+        )
+
+
+    if status:
+
+        query += """
+            AND status=?
+        """
+
+        params.append(
+            status
+        )
+
+
+    if search:
+
+        query += """
+
+            AND (
+
+                full_name LIKE ?
+
+                OR national_id LIKE ?
+
+                OR phone LIKE ?
+
+                OR registration_code LIKE ?
+
+            )
+
+        """
+
+        term = (
+            "%"
+            + search
+            + "%"
+        )
+
+        params.extend([
+
+            term,
+            term,
+            term,
+            term
+
+        ])
+
+
+    query += """
+
+        ORDER BY
+            full_name COLLATE NOCASE ASC
+
+    """
+
+
+    conn = get_db()
+
+
+    students = conn.execute(
+        query,
+        params
+    ).fetchall()
+
+
+    conn.close()
+
+
+    body = """
+
+    <div class="card">
+
+        <div class="section-title">
+
+            <div>
+
+                <p class="muted">
+                    AMBUYEE • MANAGEMENT
+                </p>
+
+                <h1>
+                    All Students
+                </h1>
+
+            </div>
+
+            <a
+                class="btn dark"
+                href="{{ url_for('director_dashboard') }}"
+            >
+                ← Dashboard
+            </a>
+
+        </div>
+
+
+        <form method="GET">
+
+            <label>
+                {{ t('search') }}
+            </label>
+
+            <input
+                name="search"
+                value="{{ search }}"
+                placeholder="Name / National ID / Phone / Registration Code"
+            >
+
+
+            <div class="grid">
+
+                <div>
+
+                    <label>
+                        {{ t('grade') }}
+                    </label>
+
+                    <select name="grade">
+
+                        <option value="">
+                            {{ t('all') }}
+                        </option>
+
+                        <option
+                            value="9"
+                            {% if request.args.get('grade') == '9' %}
+                                selected
+                            {% endif %}
+                        >
+                            Grade 9
+                        </option>
+
+                        <option
+                            value="10"
+                            {% if request.args.get('grade') == '10' %}
+                                selected
+                            {% endif %}
+                        >
+                            Grade 10
+                        </option>
+
+                        <option
+                            value="11"
+                            {% if request.args.get('grade') == '11' %}
+                                selected
+                            {% endif %}
+                        >
+                            Grade 11
+                        </option>
+
+                        <option
+                            value="12"
+                            {% if request.args.get('grade') == '12' %}
+                                selected
+                            {% endif %}
+                        >
+                            Grade 12
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        {{ t('class') }}
+                    </label>
+
+                    <select name="class_name">
+
+                        <option value="">
+                            {{ t('all') }}
+                        </option>
+
+                        {% for c in [
+                            'A',
+                            'B',
+                            'C',
+                            'D',
+                            'E',
+                            'F'
+                        ] %}
+
+                            <option
+                                value="{{ c }}"
+                                {% if request.args.get('class_name') == c %}
+                                    selected
+                                {% endif %}
+                            >
+                                Class {{ c }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        {{ t('status') }}
+                    </label>
+
+                    <select name="status">
+
+                        <option value="">
+                            {{ t('all') }}
+                        </option>
+
+                        <option
+                            value="pending"
+                            {% if status == 'pending' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('pending') }}
+                        </option>
+
+                        <option
+                            value="approved"
+                            {% if status == 'approved' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('approved') }}
+                        </option>
+
+                        <option
+                            value="rejected"
+                            {% if status == 'rejected' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('rejected') }}
+                        </option>
+
+                        <option
+                            value="returned"
+                            {% if status == 'returned' %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ t('returned') }}
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+            <button
+                class="btn"
+                type="submit"
+            >
+                {{ t('search') }}
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <div class="card">
+
+        <div class="section-title">
+
+            <h2>
+                {{ students|length }}
+                {{ t('total_students') }}
+            </h2>
+
+            <span class="muted">
+                Alphabetical order
+            </span>
+
+        </div>
+
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>#</th>
+
+                        <th>
+                            {{ t('full_name') }}
+                        </th>
+
+                        <th>
+                            {{ t('phone') }}
+                        </th>
+
+                        <th>
+                            {{ t('grade') }}
+                        </th>
+
+                        <th>
+                            {{ t('class') }}
+                        </th>
+
+                        <th>
+                            {{ t('gender') }}
+                        </th>
+
+                        <th>
+                            {{ t('status') }}
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                {% for student in students %}
+
+                    <tr>
+
+                        <td>
+                            {{ loop.index }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ student['full_name'] }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ student['phone'] }}
+                        </td>
+
+                        <td>
+                            {{ student['grade'] }}
+                        </td>
+
+                        <td>
+                            {{ student['class_name'] }}
+                        </td>
+
+                        <td>
+                            {{ student['gender'] }}
+                        </td>
+
+                        <td>
+
+                            <span
+                                class="badge
+                                {{ student['status'] }}"
+                            >
+                                {{ status_text(
+                                    student['status']
+                                ) }}
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="7">
+                            {{ t('no_students') }}
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    """
+
+
+    return page(
+
+        "All Students",
+
+        render_template_string(
+
+            body,
+
+            students=students,
+
+            search=search,
+
+            grade=grade,
+
+            class_name=class_name,
+
+            status=status
+
+        )
+
+    )
+
+
+# =========================================================
+# DIRECTOR LOGOUT
+# =========================================================
+
+@app.route("/director/logout")
+def director_logout():
+
+    session.pop(
+        "director_logged",
+        None
+    )
+
+    return redirect(
+        url_for("home")
+    )
+
+
+# =========================================================
+# PROTECTED UPLOADS
+# =========================================================
+
+@app.route(
+    "/uploads/<path:filename>"
+)
+def uploaded_file(filename):
+
+    # -----------------------------------------------------
+    # Teacher / Director can access uploaded documents.
+    # Student can access only their own uploaded documents.
+    # -----------------------------------------------------
+
+    if session.get(
+        "teacher_logged"
+    ) or session.get(
+        "director_logged"
+    ):
+
+        return send_from_directory(
+            UPLOAD_DIR,
+            filename
+        )
+
+
+    student_id = session.get(
+        "student_id"
+    )
+
+
+    if not student_id:
+
+        abort(403)
+
+
+    conn = get_db()
+
+
+    student = conn.execute(
+        """
+        SELECT
+            card_front,
+            card_back,
+            face_photo,
+            ministry_document,
+            payment_screenshot
+        FROM students
+        WHERE id=?
+        """,
+        (student_id,)
+    ).fetchone()
+
+
+    conn.close()
+
+
+    if not student:
+
+        abort(403)
+
+
+    allowed_student_files = {
+
+        student["card_front"],
+
+        student["card_back"],
+
+        student["face_photo"],
+
+        student["ministry_document"],
+
+        student["payment_screenshot"]
+
+    }
+
+
+    if filename not in allowed_student_files:
+
+        abort(403)
+
+
+    return send_from_directory(
+        UPLOAD_DIR,
+        filename
+    )
+
+
+# =========================================================
+# ERROR 413
+# =========================================================
 
 @app.errorhandler(413)
 def too_large(error):
 
-    flash(
-        "File size is too large. Maximum request size is 10 MB."
-    )
+    return page(
 
-    return redirect(
-        url_for("register")
-    )
+        "File Too Large",
+
+        """
+
+        <div class="card">
+
+            <h1>
+                File Too Large
+            </h1>
+
+            <p class="muted">
+                Maximum upload size is 10 MB.
+            </p>
+
+            <a
+                class="btn"
+                href="{{ url_for('register') }}"
+            >
+                {{ t('register') }}
+            </a>
+
+        </div>
+
+        """
+
+    ), 413
 
 
-# ============================================================
-# START APPLICATION
-# ============================================================
+# =========================================================
+# ERROR 404
+# =========================================================
+
+@app.errorhandler(404)
+def not_found(error):
+
+    return page(
+
+        "Not Found",
+
+        """
+
+        <div
+            class="card"
+            style="text-align:center;"
+        >
+
+            <h1>
+                404
+            </h1>
+
+            <p class="muted">
+                Page not found.
+            </p>
+
+            <a
+                class="btn"
+                href="{{ url_for('home') }}"
+            >
+                {{ t('home') }}
+            </a>
+
+        </div>
+
+        """
+
+    ), 404
+
+
+# =========================================================
+# ERROR 403
+# =========================================================
+
+@app.errorhandler(403)
+def forbidden(error):
+
+    return page(
+
+        "Access Denied",
+
+        """
+
+        <div
+            class="card"
+            style="text-align:center;"
+        >
+
+            <h1>
+                Access Denied
+            </h1>
+
+            <p class="muted">
+                You do not have permission to access this file.
+            </p>
+
+            <a
+                class="btn"
+                href="{{ url_for('home') }}"
+            >
+                {{ t('home') }}
+            </a>
+
+        </div>
+
+        """
+
+    ), 403
+
+
+# =========================================================
+# RUN
+# =========================================================
 
 if __name__ == "__main__":
 
-    print()
-    print("=" * 65)
-    print(" AMBUYEE SECONDARY SCHOOL ONLINE SYSTEM")
-    print("=" * 65)
-    print()
-    print("Local website:")
-    print("http://127.0.0.1:8080")
-    print()
-    print("Student registration:")
+    print("")
+    print("==============================================")
+    print(" AMBUYEE STUDENT REGISTRATION SYSTEM")
+    print("==============================================")
+    print("")
+    print("Student Registration:")
     print("http://127.0.0.1:8080/register")
-    print()
-    print("Student login:")
+    print("")
+    print("Student Login:")
     print("http://127.0.0.1:8080/student/login")
-    print()
-    print("Teacher/Admin login:")
-    print("http://127.0.0.1:8080/admin/login")
-    print()
+    print("")
+    print("Teacher Login:")
+    print("http://127.0.0.1:8080/teacher/login")
+    print("")
+    print("Director Login:")
+    print("http://127.0.0.1:8080/director/login")
+    print("")
+    print("Teacher Demo Code:")
+    print(TEACHER_CODE)
+    print("")
+    print("Director Demo Code:")
+    print(DIRECTOR_CODE)
+    print("")
     print("Database:")
-    print(DATABASE)
-    print()
+    print(DB_PATH)
+    print("")
     print("Uploads:")
-    print(UPLOAD_FOLDER)
-    print()
-    print("IMPORTANT:")
-    print("Change AMBUYEE_SECRET_KEY before production.")
-    print("Set AMBUYEE_ADMIN_CODE to your own private teacher code.")
-    print()
-    print("=" * 65)
-    print()
+    print(UPLOAD_DIR)
+    print("==============================================")
+    print("")
 
     app.run(
         host="0.0.0.0",
